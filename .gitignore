@@ -4,7 +4,7 @@ Thumbs.db
 .DS_Store
 *.o
 *.a
-*.img
+*.img*
 
 hdc-0.11.img
 Image
