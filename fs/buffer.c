@@ -38,10 +38,10 @@ int NR_BUFFERS = 0;
 
 static inline void wait_on_buffer(struct buffer_head * bh)
 {
-	cli();
+	cli();      // interrupt 막고 
 	while (bh->b_lock)
 		sleep_on(&bh->b_wait);
-	sti();
+	sti();      // interrupt 풀고
 }
 
 int sys_sync(void)
@@ -142,10 +142,14 @@ static inline void remove_from_queues(struct buffer_head * bh)
 		hash(bh->b_dev,bh->b_blocknr) = bh->b_next;
 /* remove from free list */
 	if (!(bh->b_prev_free) || !(bh->b_next_free))
+        // 초기화시 환형 자료구조이기 때문에
+        // prev, next 가 null 이면 메모리 깨짐
 		panic("Free block list corrupted");
 	bh->b_prev_free->b_next_free = bh->b_next_free;
 	bh->b_next_free->b_prev_free = bh->b_prev_free;
 	if (free_list == bh)
+        // free_list 포인터가 가리키는 버퍼가 사용해야할 버퍼 이면 
+        // 다음 버퍼로free_list 포인터가 가리키도록 변경 
 		free_list = bh->b_next_free;
 }
 
@@ -166,6 +170,10 @@ static inline void insert_into_queues(struct buffer_head * bh)
 	bh->b_next->b_prev = bh;
 }
 
+/*
+#define _hashfn(dev,block) (((unsigned)(dev^block))%NR_HASH)
+#define hash(dev,block) hash_table[_hashfn(dev,block)]
+*/
 static struct buffer_head * find_buffer(int dev, int block)
 {		
 	struct buffer_head * tmp;
@@ -205,32 +213,55 @@ struct buffer_head * get_hash_table(int dev, int block)
  *
  * The algoritm is changed: hopefully better, and an elusive bug removed.
  */
+/*
+ * unsigned char b_dirt;		 0-clean,1-dirty 
+ * unsigned char b_lock;		 0 - ok, 1 -locked 
+ */
 #define BADNESS(bh) (((bh)->b_dirt<<1)+(bh)->b_lock)
+/* BADNESS 는dirty 하지 않고 lock이 안걸려 있고
+ * #define BADNESS(bh) (((bh)->b_dirt*2)+(bh)->b_lock)
+ * [dirty][lock]
+ */
+// buffer_head 를 할당받거나
+// 같은 dev, block 정보를 가지는 buffer_head 를 받는다.
 struct buffer_head * getblk(int dev,int block)
 {
 	struct buffer_head * tmp, * bh;
 
 repeat:
-	if ((bh = get_hash_table(dev,block)))
+	if (bh = get_hash_table(dev,block))
 		return bh;
+
+    /* free_list 초기화는 buffer_init() 에서 수행 
+     * 최초수행시 start_buffer 를 가리키고 있음
+     */
 	tmp = free_list;
 	do {
-		if (tmp->b_count)
+		if (tmp->b_count) // 참조 카운트
+        	//unsigned char b_count;		/* users using this block */
 			continue;
+
 		if (!bh || BADNESS(tmp)<BADNESS(bh)) {
 			bh = tmp;
 			if (!BADNESS(tmp))
+                // dirty 하지 않고 lock 도 없고
+                // 깨끗한
 				break;
 		}
 /* and repeat until we find something good */
 	} while ((tmp = tmp->b_next_free) != free_list);
+
 	if (!bh) {
+        // 위 loop 에서 참조 카운트 문제로 모두다 continue
+        // 사용할수 있는 버퍼를 찾지 못하면
 		sleep_on(&buffer_wait);
 		goto repeat;
 	}
-	wait_on_buffer(bh);
+
+	wait_on_buffer(bh); // lock 이 풀릴때까지 대기 
 	if (bh->b_count)
 		goto repeat;
+
 	while (bh->b_dirt) {
 		sync_dev(bh->b_dev);
 		wait_on_buffer(bh);
@@ -239,14 +270,28 @@ repeat:
 	}
 /* NOTE!! While we slept waiting for this block, somebody else might */
 /* already have added "this" block to the cache. check it */
+    // 사용할 버퍼를 다시 찾아본다.
+    // 해쉬 테이블에 연결된 버퍼인지 확인
 	if (find_buffer(dev,block))
+    {
+        // hash 테이블에 등록되어 있으면 위로 올라가 
+        // buffer 를 다시 찾는다.
 		goto repeat;
+    }
+
 /* OK, FINALLY we know that this buffer is the only one of it's kind, */
 /* and that it's unused (b_count=0), unlocked (b_lock=0), and clean */
 	bh->b_count=1;
 	bh->b_dirt=0;
 	bh->b_uptodate=0;
+
+    // !!!!추정!!!!
+    // 프로세스간 동시성 이슈 로 인하여
+    // 큐에서 먼저 제거 한 이후에 
+    // 정보를 설정하고 
+    // 그 다음에 큐에 다시 넣는다.
 	remove_from_queues(bh);
+
 	bh->b_dev=dev;
 	bh->b_blocknr=block;
 	insert_into_queues(bh);

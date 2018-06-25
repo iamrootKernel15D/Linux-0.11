@@ -67,19 +67,28 @@ static void add_request(struct blk_dev_struct * dev, struct request * req)
 
 	req->next = NULL;
 	cli();
+
 	if (req->bh)
 		req->bh->b_dirt = 0;
+
+    // dev 에 이전의 request 없으면
 	if (!(tmp = dev->current_request)) {
 		dev->current_request = req;
 		sti();
 		(dev->request_fn)();
 		return;
 	}
+
+    // dev 에 이전의 request 가 있으면 아래를 수행 
+
+    // 엘레베이터 알고리즘 적용하여
+    // 적절한 위치를 찾는다.
 	for ( ; tmp->next ; tmp=tmp->next)
 		if ((IN_ORDER(tmp,req) || 
 		    !IN_ORDER(tmp,tmp->next)) &&
 		    IN_ORDER(req,tmp->next))
 			break;
+
 	req->next=tmp->next;
 	tmp->next=req;
 	sti();
@@ -100,10 +109,13 @@ static void make_request(int major,int rw, struct buffer_head * bh)
 		else
 			rw = WRITE;
 	}
+
 	if (rw!=READ && rw!=WRITE)
 		panic("Bad block dev command, must be R/W/RA/WA");
+
 	lock_buffer(bh);
-	if ((rw == WRITE && !bh->b_dirt) || (rw == READ && bh->b_uptodate)) {
+	if ((rw == WRITE && !bh->b_dirt) || 
+        (rw == READ && bh->b_uptodate)) {
 		unlock_buffer(bh);
 		return;
 	}
@@ -112,14 +124,32 @@ repeat:
  * we want some room for reads: they take precedence. The last third
  * of the requests are only for reads.
  */
+/*
+ NR_REQUEST 32
+struct request {
+	int dev;		 -1 if no request 
+	int cmd;		 READ or WRITE 
+	int errors;
+	unsigned long sector;
+	unsigned long nr_sectors;
+	char * buffer;
+	struct task_struct * waiting;
+	struct buffer_head * bh;
+	struct request * next;
+};
+*/
 	if (rw == READ)
-		req = request+NR_REQUEST;
+		req = request+NR_REQUEST; // req = &req[NR_REQUEST]
 	else
 		req = request+((NR_REQUEST*2)/3);
+
 /* find an empty request */
 	while (--req >= request)
+    {
 		if (req->dev<0)
 			break;
+    }
+
 /* if none found, sleep on new requests: check for rw_ahead */
 	if (req < request) {
 		if (rw_ahead) {
@@ -129,25 +159,30 @@ repeat:
 		sleep_on(&wait_for_request);
 		goto repeat;
 	}
+
 /* fill up the request-info, and add it to the queue */
 	req->dev = bh->b_dev;
 	req->cmd = rw;
 	req->errors=0;
 	req->sector = bh->b_blocknr<<1;
 	req->nr_sectors = 2;
-	req->buffer = bh->b_data;
+	req->buffer = bh->b_data;   // 버퍼 블록 주소
 	req->waiting = NULL;
 	req->bh = bh;
 	req->next = NULL;
-	add_request(major+blk_dev,req);
+
+	add_request(major+blk_dev,req); // add_request( &blk_dev[major], req );
 }
 
 void ll_rw_block(int rw, struct buffer_head * bh)
 {
 	unsigned int major;
-
+/*
+#define MAJOR(a) (((unsigned)(a))>>8)
+#define MINOR(a) ((a)&0xff)
+*/
 	if ((major=MAJOR(bh->b_dev)) >= NR_BLK_DEV ||
-	!(blk_dev[major].request_fn)) {
+	    !(blk_dev[major].request_fn)) {
 		printk("Trying to read nonexistent block-device\n\r");
 		return;
 	}

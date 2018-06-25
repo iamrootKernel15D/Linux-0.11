@@ -144,6 +144,20 @@ if (__res >= 0) \
 errno = -__res; \
 return -1; \
 }
+/*
+#define _syscall0( int, fork )
+int fork(void)
+{
+    long __res; 
+    __asm__ volatile ("int $0x80" \
+    	: "=a" (__res) \
+    	: "0" (__NR_fork)); 
+    if (__res >= 0) 
+    	return (int) __res; 
+    errno = -__res; 
+    return -1; 
+}
+*/
 
 #define _syscall1(type,name,atype,a) \
 type name(atype a) \

@@ -79,6 +79,7 @@ int sys_setup(void * BIOS)
 	if (!callable)
 		return -1;
 	callable = 0;
+
 #ifndef HD_TYPE
 	for (drive=0 ; drive<2 ; drive++) {
 		hd_info[drive].cyl = *(unsigned short *) BIOS;
@@ -94,10 +95,16 @@ int sys_setup(void * BIOS)
 	else
 		NR_HD=1;
 #endif
+    // 물리 디스크에 대한 정보를 셋팅
+    // 물리 디스크의 전체 섹터수를 계산
 	for (i=0 ; i<NR_HD ; i++) {
 		hd[i*5].start_sect = 0;
 		hd[i*5].nr_sects = hd_info[i].head*
 				hd_info[i].sect*hd_info[i].cyl;
+        /* 하나의 디스크는 최대 4개의 논리적 디스크를 가질수 있다.
+         * 0 은 물리디스크, 1-4 논리 디스크, 최대 5개다.
+         * 첫번째 물리 디스크는 0*5, 두번째물리디스크는 1*5
+         */
 	}
 
 	/*
@@ -129,12 +136,21 @@ int sys_setup(void * BIOS)
 			NR_HD = 1;
 	else
 		NR_HD = 0;
+
+    // 안쓰는 hd 를 0 으로 설정
 	for (i = NR_HD ; i < 2 ; i++) {
 		hd[i*5].start_sect = 0;
 		hd[i*5].nr_sects = 0;
 	}
+
 	for (drive=0 ; drive<NR_HD ; drive++) {
-		if (!(bh = bread(0x300 + drive*5,0))) {
+        /* 첫번째 물리디스크의 디바이스 넘버는 0x300
+         * 두번째 물리디스크의 디바이스 넘버는 0x305
+         * 블록 0은 
+         * 부트 블록이라고 하고 물리디스크마다 하나씩 존재하고 파티션정보가 있음
+         */
+        if (!(bh = bread(0x300 + drive*5 /* 디바이스 넘버*/,
+                         0 /* 블록 인덱스*/))) {
 			printk("Unable to read partition table of drive %d\n\r",
 				drive);
 			panic("");
@@ -187,7 +203,9 @@ static void hd_out(unsigned int drive,unsigned int nsect,unsigned int sect,
 		panic("Trying to write bad sector");
 	if (!controller_ready())
 		panic("HD controller not ready");
+
 	do_hd = intr_addr;
+
 	outb_p(hd_info[drive].ctl,HD_CMD);
 	port=HD_DATA;
 	outb_p(hd_info[drive].wpcom>>2,++port);
@@ -204,7 +222,7 @@ static int drive_busy(void)
 	unsigned int i;
 
 	for (i = 0; i < 10000; i++)
-		if (READY_STAT == (inb_p(HD_STATUS) & (BUSY_STAT|READY_STAT)))
+		if (READY_STAT == ( (inb_p(HD_STATUS) & (BUSY_STAT|READY_STAT))) )
 			break;
 	i = inb(HD_STATUS);
 	i &= BUSY_STAT | READY_STAT | SEEK_STAT;
@@ -230,8 +248,13 @@ static void reset_controller(void)
 static void reset_hd(int nr)
 {
 	reset_controller();
-	hd_out(nr,hd_info[nr].sect,hd_info[nr].sect,hd_info[nr].head-1,
-		hd_info[nr].cyl,WIN_SPECIFY,&recal_intr);
+	hd_out(nr,
+           hd_info[nr].sect,
+           hd_info[nr].sect,
+           hd_info[nr].head-1,
+		   hd_info[nr].cyl,
+           WIN_SPECIFY,
+           &recal_intr);
 }
 
 void unexpected_hd_interrupt(void)
@@ -299,18 +322,62 @@ void do_hd_request(void)
 	unsigned int nsect;
 
 	INIT_REQUEST;
+    /*
+#define INIT_REQUEST \
+repeat: \
+	if (!CURRENT) \
+		return; \
+	if (MAJOR(CURRENT->dev) != MAJOR_NR) \
+		panic(DEVICE_NAME ": request list destroyed"); \
+	if (CURRENT->bh) { \
+		if (!CURRENT->bh->b_lock) \
+			panic(DEVICE_NAME ": block not locked"); \
+	}
+#define CURRENT (blk_dev[MAJOR_NR].current_request)
+*/
 	dev = MINOR(CURRENT->dev);
 	block = CURRENT->sector;
-	if (dev >= 5*NR_HD || block+2 > hd[dev].nr_sects) {
+	if (dev >= 5*NR_HD || 
+        block+2 > hd[dev].nr_sects) { // ??? +2 왜 하는지???
 		end_request(0);
 		goto repeat;
 	}
-	block += hd[dev].start_sect;
-	dev /= 5;
-	__asm__("divl %4":"=a" (block),"=d" (sec):"0" (block),"1" (0),
-		"r" (hd_info[dev].sect));
-	__asm__("divl %4":"=a" (cyl),"=d" (head):"0" (block),"1" (0),
-		"r" (hd_info[dev].head));
+
+	block += hd[dev].start_sect; // block을 offset개념으로..
+	dev /= 5;                    // 몇번째 물리 디스크에 속하는지
+	__asm__("divl %4":"=a" (block),
+                      "=d" (sec)
+                     :"0" (block),
+                      "1" (0),
+		              "r" (hd_info[dev].sect));
+    /*	
+    sec = hd_info[dev].sect;
+	_asm {
+		mov eax,block
+		xor edx,edx
+		mov ebx,sec
+		div ebx         // eax / edx -> block / sec
+		mov block,eax
+		mov sec,edx
+	}
+    */
+	__asm__("divl %4":"=a" (cyl),
+                      "=d" (head)
+                     :"0" (block),
+                      "1" (0),
+		              "r" (hd_info[dev].head));
+    /*
+   	head = hd_info[dev].head;
+	_asm {
+		mov eax,block
+		xor edx,edx
+		mov ebx,head
+		div ebx
+		mov cyl,eax
+		mov head,edx
+	}
+    */
+
 	sec++;
 	nsect = CURRENT->nr_sectors;
 	if (reset) {

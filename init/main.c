@@ -139,7 +139,13 @@ void main(void)		/* This really IS void, no error here. */
 	sti();
 	move_to_user_mode();
 	if (!fork()) {		/* we count on this going ok */
-		init();
+    /* On success, 
+     * the PID of the child process is returned in the parent, and 
+     * 0 is returned in the child.  On failure, 
+     * -1 is returned in the parent, 
+     *  no child process is created, and errno is set appropriately. */
+    // child 가 수행 
+        init();
 	}
 /*
  *   NOTE!!   For any other task 'pause()' would mean we have to get a

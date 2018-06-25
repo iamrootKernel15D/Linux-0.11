@@ -113,7 +113,7 @@ struct task_struct {
  * your own risk!. Base=0, limit=0x9ffff (=640kB)
  */
 #define INIT_TASK \
-/* state etc */	{ 0,15,15, \
+/* state etc */	{ 0,15 /*counter*/,15, \
 /* signals */	0,{{},},0, \
 /* ec,brk... */	0,0,0,0,0,0, \
 /* pid etc.. */	0,-1,0,0,0, \
@@ -169,6 +169,15 @@ __asm__("str %%ax\n\t" \
  * checking that n isn't the current task, in which case it does nothing.
  * This also clears the TS-flag if the task we switched to has used
  * tha math co-processor latest.
+ */
+/* https://stackoverflow.com/questions/33783692/what-does-the-ljmp-instruction-do-in-the-linux-kernel-fork-system-call
+ * 1. switch 할 프로세스가 현재 프로세스면 종료
+ * 2. dx 를 __tmp.b 에 저장
+ * 3. 현재프로세스와 ecx 교환, task[n] 을 현재 프로세스로 변경
+ * 4. ljmp tss[n]
+ * 5. 보조 프로세스를 사용여부 확인
+ * 6. 사용않하면 1로 점프 
+ *    아니면 CR0 의 task 변경 플래그 클리어
  */
 #define switch_to(n) {\
 struct {long a,b;} __tmp; \

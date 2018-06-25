@@ -126,17 +126,39 @@ void schedule(void)
 		next = 0;
 		i = NR_TASKS;
 		p = &task[NR_TASKS];
-		while (--i) {
+
+        /* while 에서 task 0 는 제외*/
+		while (--i) 
+        {
 			if (!*--p)
 				continue;
+
+            /* 최대 counter(time slice)를 가진 프로세스 찾는다. */
 			if ((*p)->state == TASK_RUNNING && (*p)->counter > c)
-				c = (*p)->counter, next = i;
+				//c = (*p)->counter, next = i;
+            {
+				c = (*p)->counter;
+                next = i;
+            }
 		}
-		if (c) break;
+
+        /* 1. TASK_RUNNING 인 task 가 존재하지 않으면 
+         * 2. TASK_RUNNING 인 task 가 존재하고 counter(time slice) 가 0보다 크면 
+         * while loop 를 빠져 나간다. */
+		if (c) 
+            break;
+
+        /* TASK_RUNNING 인 모든 Task 가 counter 가 0 이면 
+         * counter 를 재 계산 한다. */
 		for(p = &LAST_TASK ; p > &FIRST_TASK ; --p)
+        {
 			if (*p)
-				(*p)->counter = ((*p)->counter >> 1) +
-						(*p)->priority;
+            {
+				(*p)->counter = ((*p)->counter >> 1) + (*p)->priority;
+                // counter / 2 + priority
+                // 15 / 2 + 15 = 22
+            }
+        }
 	}
 	switch_to(next);
 }
