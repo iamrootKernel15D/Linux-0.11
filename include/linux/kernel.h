@@ -20,3 +20,5 @@ void free_s(void * obj, int size);
  */
 #define suser() (current->euid == 0)
 
+/* Iamroot15D debug only */
+#define PANICF(fmt, ...) printk(fmt, __VA_ARGS__); __asm__ ( "cli\n\t" "hlt\n\t"  );
