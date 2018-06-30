@@ -199,27 +199,41 @@ struct m_inode * get_empty_inode(void)
 
 	do {
 		inode = NULL;
-		for (i = NR_INODE; i ; i--) {
-			if (++last_inode >= inode_table + NR_INODE)
-				last_inode = inode_table;
-			if (!last_inode->i_count) {
+
+        // NR_INODE : 32
+		for (i = NR_INODE; i ; i--) 
+        {
+			if (++last_inode >= inode_table + NR_INODE) // last_inode >= inode_table[NR_INODE]
+				last_inode = inode_table;      // inode_table에서 벗어나면 다시 최초위치로 
+
+            // last_inode->i_count 가 0 이면 
+            // last_inode 가 할당되어 있지 않으면
+			if (!last_inode->i_count) { 
 				inode = last_inode;
+                // 깨끗하면 
 				if (!inode->i_dirt && !inode->i_lock)
 					break;
 			}
 		}
+
+        // 위 for 문에서 inode 을 못찾으면 panic
 		if (!inode) {
 			for (i=0 ; i<NR_INODE ; i++)
 				printk("%04x: %6d\t",inode_table[i].i_dev,
 					inode_table[i].i_num);
 			panic("No free inodes in mem");
 		}
+
+        // wait unlock 
 		wait_on_inode(inode);
+
+        // dirty 일 경우
 		while (inode->i_dirt) {
 			write_inode(inode);
 			wait_on_inode(inode);
 		}
-	} while (inode->i_count);
+	} while (inode->i_count);   // 참조 카운트가 존재하면 do 처음으로
+
 	memset(inode,0,sizeof(*inode));
 	inode->i_count = 1;
 	return inode;
@@ -247,19 +261,26 @@ struct m_inode * iget(int dev,int nr)
 
 	if (!dev)
 		panic("iget with dev==0");
+
 	empty = get_empty_inode();
 	inode = inode_table;
-	while (inode < NR_INODE+inode_table) {
+    
+	while (inode < NR_INODE+inode_table) 
+    {
+        // 같은 inode 찾기
 		if (inode->i_dev != dev || inode->i_num != nr) {
 			inode++;
 			continue;
 		}
+        // lock 대기
 		wait_on_inode(inode);
+        // 같은 inode 비교
 		if (inode->i_dev != dev || inode->i_num != nr) {
-			inode = inode_table;
+			inode = inode_table; // 다를 경우 처음부터
 			continue;
 		}
-		inode->i_count++;
+
+		inode->i_count++;       // 참조 카운트 증가
 		if (inode->i_mount) {
 			int i;
 
@@ -278,16 +299,22 @@ struct m_inode * iget(int dev,int nr)
 			inode = inode_table;
 			continue;
 		}
-		if (empty)
-			iput(empty);
+
+		if (empty)          // empty 검사가 굳이 필요한가???
+			iput(empty);    // empty 가 필요 없으므로 다시 반납 
+
 		return inode;
 	}
+
 	if (!empty)
 		return (NULL);
+
 	inode=empty;
 	inode->i_dev = dev;
 	inode->i_num = nr;
+    
 	read_inode(inode);
+
 	return inode;
 }
 
@@ -300,13 +327,22 @@ static void read_inode(struct m_inode * inode)
 	lock_inode(inode);
 	if (!(sb=get_super(inode->i_dev)))
 		panic("trying to read inode without dev");
-	block = 2 + sb->s_imap_blocks + sb->s_zmap_blocks +
-		(inode->i_num-1)/INODES_PER_BLOCK;
+
+    // inode 가 저장된 위치를 찾는다.
+	block = 2 + 
+            sb->s_imap_blocks +     // i-node bitmap 
+            sb->s_zmap_blocks +     // 논리block bitmap
+		    (inode->i_num-1) / INODES_PER_BLOCK;
+    
+    // 저장된 위치에서 inode 정보를 읽고
 	if (!(bh=bread(inode->i_dev,block)))
 		panic("unable to read i-node block");
+    
+    // disk 로 부터 읽은 inode 정보를 구조체에 설정
 	*(struct d_inode *)inode =
 		((struct d_inode *)bh->b_data)
 			[(inode->i_num-1)%INODES_PER_BLOCK];
+
 	brelse(bh);
 	unlock_inode(inode);
 }

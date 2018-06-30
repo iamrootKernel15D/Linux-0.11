@@ -155,20 +155,26 @@ int sys_setup(void * BIOS)
 				drive);
 			panic("");
 		}
+
+        // validate
 		if (bh->b_data[510] != 0x55 || (unsigned char)
 		    bh->b_data[511] != 0xAA) {
 			printk("Bad partition table on drive %d\n\r",drive);
 			panic("");
 		}
+
 		p = 0x1BE + (void *)bh->b_data;
+        // Partition 정보 설정
 		for (i=1;i<5;i++,p++) {
 			hd[i+5*drive].start_sect = p->start_sect;
 			hd[i+5*drive].nr_sects = p->nr_sects;
 		}
 		brelse(bh);
 	}
+
 	if (NR_HD)
 		printk("Partition table%s ok.\n\r",(NR_HD>1)?"s":"");
+
 	rd_load();
 	mount_root();
 	return (0);
@@ -186,10 +192,12 @@ static int win_result(void)
 {
 	int i=inb_p(HD_STATUS);
 
-	if ((i & (BUSY_STAT | READY_STAT | WRERR_STAT | SEEK_STAT | ERR_STAT))
-		== (READY_STAT | SEEK_STAT))
+    if ( ( i & ( READY_STAT | SEEK_STAT | BUSY_STAT | WRERR_STAT | ERR_STAT ) )
+            == ( READY_STAT | SEEK_STAT ) )
 		return(0); /* ok */
-	if (i&1) i=inb(HD_ERROR);
+
+	if ( i & 1 ) 
+        i=inb(HD_ERROR);
 	return (1);
 }
 
@@ -265,7 +273,8 @@ void unexpected_hd_interrupt(void)
 static void bad_rw_intr(void)
 {
 	if (++CURRENT->errors >= MAX_ERRORS)
-		end_request(0);
+		end_request(0); // 0은 비정상 
+
 	if (CURRENT->errors > MAX_ERRORS/2)
 		reset = 1;
 }
@@ -277,11 +286,16 @@ static void read_intr(void)
 		do_hd_request();
 		return;
 	}
+
+//#define port_read(port,buf,nr) \
+//__asm__("cld;rep;insw"::"d" (port),"D" (buf),"c" (nr))
+// insw : dx (port) 에서 es:di 로 전송 word 단위로
 	port_read(HD_DATA,CURRENT->buffer,256);
 	CURRENT->errors = 0;
-	CURRENT->buffer += 512;
-	CURRENT->sector++;
-	if (--CURRENT->nr_sectors) {
+	CURRENT->buffer += 512; // word 단위로 256번 
+	CURRENT->sector++;      // 현재 sector 를 읽었으니 1을 증가 
+	if ( --(CURRENT->nr_sectors) ) { 
+        // 다 읽지 못했으면다시 hd interrupt 대기
 		do_hd = &read_intr;
 		return;
 	}

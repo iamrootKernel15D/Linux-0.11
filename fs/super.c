@@ -37,6 +37,7 @@ static void lock_super(struct super_block * sb)
 	sti();
 }
 
+// unlock
 static void free_super(struct super_block * sb)
 {
 	cli();
@@ -59,15 +60,19 @@ struct super_block * get_super(int dev)
 
 	if (!dev)
 		return NULL;
-	s = 0+super_block;
-	while (s < NR_SUPER+super_block)
+
+	s = 0+super_block;  // super_block[0]
+
+	while (s < NR_SUPER+super_block) // s < super_block[NR_SUPER]
+    {
 		if (s->s_dev == dev) {
 			wait_on_super(s);
 			if (s->s_dev == dev)
 				return s;
-			s = 0+super_block;
+			s = 0+super_block;      // dirty 이기 때문에 처음부터 다시 비교
 		} else
-			s++;
+			s++;                    // increase
+    }
 	return NULL;
 }
 
@@ -105,50 +110,70 @@ static struct super_block * read_super(int dev)
 
 	if (!dev)
 		return NULL;
-	check_disk_change(dev);
+
+	check_disk_change(dev);     // 디스크가 변경되었는지 확인
+
 	if ((s = get_super(dev)))
 		return s;
-	for (s = 0+super_block ;; s++) {
-		if (s >= NR_SUPER+super_block)
-			return NULL;
-		if (!s->s_dev)
+
+	for (s = 0+super_block ;; s++)      // super_block[0]
+    {
+		if (s >= NR_SUPER+super_block)  // super_block[NR_SUPER]
+			return NULL;                // 빈 super_block 이 없으면 
+
+		if (!s->s_dev)                  // 비어 있으면, 초기값이 0
 			break;
 	}
+
 	s->s_dev = dev;
 	s->s_isup = NULL;
 	s->s_imount = NULL;
 	s->s_time = 0;
 	s->s_rd_only = 0;
 	s->s_dirt = 0;
+
 	lock_super(s);
-	if (!(bh = bread(dev,1))) {
+
+	if (!(bh = bread(dev,1))) {     // 1 block read
 		s->s_dev=0;
 		free_super(s);
 		return NULL;
 	}
+    
 	*((struct d_super_block *) s) =
 		*((struct d_super_block *) bh->b_data);
 	brelse(bh);
+
+    // magic number validate
 	if (s->s_magic != SUPER_MAGIC) {
 		s->s_dev = 0;
 		free_super(s);
 		return NULL;
 	}
+
+    // 초기화
 	for (i=0;i<I_MAP_SLOTS;i++)
 		s->s_imap[i] = NULL;
 	for (i=0;i<Z_MAP_SLOTS;i++)
 		s->s_zmap[i] = NULL;
+
 	block=2;
+    // s->s_imap_blocks 의 경우   
+    // *((struct d_super_block *) s) = *((struct d_super_block *) bh->b_data);
+    // 에서 설정된 값
 	for (i=0 ; i < s->s_imap_blocks ; i++)
 		if ((s->s_imap[i]=bread(dev,block)))
 			block++;
 		else
 			break;
+
 	for (i=0 ; i < s->s_zmap_blocks ; i++)
 		if ((s->s_zmap[i]=bread(dev,block)))
 			block++;
 		else
 			break;
+
+    // 읽은 개수와 메타 정보가 다르면 
 	if (block != 2+s->s_imap_blocks+s->s_zmap_blocks) {
 		for(i=0;i<I_MAP_SLOTS;i++)
 			brelse(s->s_imap[i]);
@@ -158,9 +183,13 @@ static struct super_block * read_super(int dev)
 		free_super(s);
 		return NULL;
 	}
+
 	s->s_imap[0]->b_data[0] |= 1;
 	s->s_zmap[0]->b_data[0] |= 1;
+
+    // unlock
 	free_super(s);
+
 	return s;
 }
 
@@ -247,35 +276,64 @@ void mount_root(void)
 
 	if (32 != sizeof (struct d_inode))
 		panic("bad i-node size");
+
+    // 파일 테이블 초기화
 	for(i=0;i<NR_FILE;i++)
 		file_table[i].f_count=0;
 	if (MAJOR(ROOT_DEV) == 2) {
 		printk("Insert root floppy and press ENTER");
 		wait_for_keypress();
 	}
+
+    // 구조체 초기화 
 	for(p = &super_block[0] ; p < &super_block[NR_SUPER] ; p++) {
 		p->s_dev = 0;
 		p->s_lock = 0;
 		p->s_wait = NULL;
 	}
+
+    // ROOT_DEV 0x0101
 	if (!(p=read_super(ROOT_DEV)))
 		panic("Unable to mount root");
+
 	if (!(mi=iget(ROOT_DEV,ROOT_INO)))
 		panic("Unable to read root i-node");
+
 	mi->i_count += 3 ;	/* NOTE! it is logically used 4 times, not 1 */
-	p->s_isup = p->s_imount = mi;
+
+	p->s_isup = p->s_imount = mi; // ??
+
 	current->pwd = mi;
 	current->root = mi;
 	free=0;
 	i=p->s_nzones;
+
 	while (-- i >= 0)
-		if (!set_bit(i&8191,p->s_zmap[i>>13]->b_data))
+    {
+///* set_bit uses setb, as gas doesn't recognize setc */
+//#define set_bit(bitnr,addr) ({ \
+//register int __res ; \
+//__asm__("bt %2,%3;                // bt i&8191, p->s_zmap[i>>13]->b_data
+//         setb %%al":"=a" (__res)
+//                   :"a" (0),
+//                    "r" (bitnr),
+//                    "m" (*(addr))); \
+//__res; })
+        // 8191 : 2^13 - 1
+		if (!set_bit( i&8191,
+                      p->s_zmap[i>>13]->b_data))
 			free++;
+    }
+
 	printk("%d/%d free blocks\n\r",free,p->s_nzones);
 	free=0;
 	i=p->s_ninodes+1;
+
 	while (-- i >= 0)
+    {
 		if (!set_bit(i&8191,p->s_imap[i>>13]->b_data))
 			free++;
+    }
+
 	printk("%d/%d free inodes\n\r",free,p->s_ninodes);
 }
