@@ -39,6 +39,7 @@ int NR_BUFFERS = 0;
 static inline void wait_on_buffer(struct buffer_head * bh)
 {
 	cli();      // interrupt 막고 
+    // b_lock이 풀릴때까지 loop
 	while (bh->b_lock)
 		sleep_on(&bh->b_wait);
 	sti();      // interrupt 풀고
@@ -117,13 +118,17 @@ void check_disk_change(int dev)
 {
 	int i;
 
+    // 2 : floppy
 	if (MAJOR(dev) != 2)
 		return;
+
 	if (!floppy_change(dev & 0x03))
 		return;
+
 	for (i=0 ; i<NR_SUPER ; i++)
 		if (super_block[i].s_dev == dev)
 			put_super(super_block[i].s_dev);
+    
 	invalidate_inodes(dev);
 	invalidate_buffers(dev);
 }

@@ -108,17 +108,21 @@ static inline void unlock_buffer(struct buffer_head * bh)
 
 static inline void end_request(int uptodate)
 {
-	DEVICE_OFF(CURRENT->dev);
+	DEVICE_OFF(CURRENT->dev);   // floppy 에서만 존재 
+
 	if (CURRENT->bh) {
 		CURRENT->bh->b_uptodate = uptodate;
 		unlock_buffer(CURRENT->bh);
 	}
+
 	if (!uptodate) {
 		printk(DEVICE_NAME " I/O error\n\r");
 		printk("dev %04x, block %d\n\r",CURRENT->dev,
 			CURRENT->bh->b_blocknr);
 	}
-	wake_up(&CURRENT->waiting);
+
+	wake_up(&CURRENT->waiting); // waiting 을 설정하는곳 없음
+    //extern struct task_struct * wait_for_request;
 	wake_up(&wait_for_request);
 	CURRENT->dev = -1;
 	CURRENT = CURRENT->next;

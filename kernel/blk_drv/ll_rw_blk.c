@@ -151,11 +151,16 @@ struct request {
     }
 
 /* if none found, sleep on new requests: check for rw_ahead */
-	if (req < request) {
+	if (req < request)  
+    {
 		if (rw_ahead) {
 			unlock_buffer(bh);
 			return;
 		}
+        ///*
+        // * used to wait on when there are no free requests
+        // */
+        //struct task_struct * wait_for_request = NULL;
 		sleep_on(&wait_for_request);
 		goto repeat;
 	}
@@ -165,7 +170,7 @@ struct request {
 	req->cmd = rw;
 	req->errors=0;
 	req->sector = bh->b_blocknr<<1;
-	req->nr_sectors = 2;
+	req->nr_sectors = 2;        // 읽을 섹터 수
 	req->buffer = bh->b_data;   // 버퍼 블록 주소
 	req->waiting = NULL;
 	req->bh = bh;
