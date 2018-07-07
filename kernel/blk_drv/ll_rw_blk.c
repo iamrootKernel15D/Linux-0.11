@@ -23,6 +23,7 @@ struct request request[NR_REQUEST];
 /*
  * used to wait on when there are no free requests
  */
+// 빈 req 가 없으면 wait_for_request 에 달아 놓는다.
 struct task_struct * wait_for_request = NULL;
 
 /* blk_dev_struct is:

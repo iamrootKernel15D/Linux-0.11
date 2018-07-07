@@ -179,6 +179,7 @@ __asm__("str %%ax\n\t" \
  * 6. 사용않하면 1로 점프 
  *    아니면 CR0 의 task 변경 플래그 클리어
  */
+// tss 을 restore 되면서 interrupt 설정이 그이전 으로 변경 된다
 #define switch_to(n) {\
 struct {long a,b;} __tmp; \
 __asm__("cmpl %%ecx,current\n\t" \

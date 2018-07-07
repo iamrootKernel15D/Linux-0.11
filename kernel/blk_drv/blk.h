@@ -94,6 +94,7 @@ extern struct task_struct * wait_for_request;
 #define CURRENT_DEV DEVICE_NR(CURRENT->dev)
 
 #ifdef DEVICE_INTR
+// #define DEVICE_INTR do_hd
 void (*DEVICE_INTR)(void) = NULL;
 #endif
 static void (DEVICE_REQUEST)(void);
@@ -125,6 +126,7 @@ static inline void end_request(int uptodate)
     //extern struct task_struct * wait_for_request;
 	wake_up(&wait_for_request);
 	CURRENT->dev = -1;
+    // 다음 req 처리를 위해서 다음으로
 	CURRENT = CURRENT->next;
 }
 

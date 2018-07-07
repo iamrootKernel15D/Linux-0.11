@@ -88,11 +88,14 @@ void rd_load(void)
 		printk("Disk error while looking for ramdisk!\n");
 		return;
 	}
+    // super_block <- d_super_block
 	*((struct d_super_block *) &s) = *((struct d_super_block *) bh->b_data);
 	brelse(bh);
+
 	if (s.s_magic != SUPER_MAGIC)
 		/* No ram disk image present, assume normal floppy boot */
 		return;
+
 	nblocks = s.s_nzones << s.s_log_zone_size;
 	if (nblocks > (rd_length >> BLOCK_SIZE_BITS)) {
 		printk("Ram disk image too big!  (%d blocks, %d avail)\n", 
@@ -101,6 +104,7 @@ void rd_load(void)
 	}
 	printk("Loading %d bytes into ram disk... 0000k", 
 		nblocks << BLOCK_SIZE_BITS);
+
 	cp = rd_start;
 	while (nblocks) {
 		if (nblocks > 2) 
