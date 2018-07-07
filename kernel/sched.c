@@ -178,10 +178,14 @@ void sleep_on(struct task_struct **p)
 		return;
 	if (current == &(init_task.task))
 		panic("task[0] trying to sleep");
+    // 이전에 대기 하는 task 를 백업하고
+    // bh 에깨어주는 task 를 현재 task 로 변경
 	tmp = *p;
 	*p = current;
 	current->state = TASK_UNINTERRUPTIBLE;
 	schedule();
+
+    // 지역변수를 이용하여 queue같은 작업을 수행
 	if (tmp)
 		tmp->state=0;
 }

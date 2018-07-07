@@ -246,7 +246,7 @@ repeat:
         	//unsigned char b_count;		/* users using this block */
 			continue;
 
-		if (!bh || BADNESS(tmp)<BADNESS(bh)) {
+		if (!bh || BADNESS(tmp) < BADNESS(bh)) {
 			bh = tmp;
 			if (!BADNESS(tmp))
                 // dirty 하지 않고 lock 도 없고
