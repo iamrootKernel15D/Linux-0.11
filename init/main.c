@@ -185,17 +185,25 @@ void init(void)
 	printf("%d buffers = %d bytes buffer space\n\r",NR_BUFFERS,
 		NR_BUFFERS*BLOCK_SIZE);
 	printf("Free mem: %d bytes\n\r",memory_end-main_memory_start);
-	if (!(pid=fork())) {
+	
+	if (!(pid=fork())) 
+	{
 		close(0);
 		if (open("/etc/rc",O_RDONLY,0))
 			_exit(1);
+		/*
+		static char * argv_rc[] = { "/bin/sh", NULL };
+		static char * envp_rc[] = { "HOME=/", NULL };
+		*/
 		execve("/bin/sh",argv_rc,envp_rc);
 		_exit(2);
 	}
+
 	if (pid>0)
 		while (pid != wait(&i))
 			/* nothing */;
-	while (1) {
+	while (1) 
+	{
 		if ((pid=fork())<0) {
 			printf("Fork failed in init\r\n");
 			continue;
