@@ -109,15 +109,18 @@ static struct buffer_head * find_entry(struct m_inode ** dir,
 	if (!namelen)
 		return NULL;
 /* check for '..', as we might have to do some "magic" for it */
-	if (namelen==2 && get_fs_byte(name)=='.' && get_fs_byte(name+1)=='.') {
+	if (namelen==2 && get_fs_byte(name)=='.' && get_fs_byte(name+1)=='.') 
+	{
 /* '..' in a pseudo-root results in a faked '.' (just change namelen) */
 		if ((*dir) == current->root)
 			namelen=1;
-		else if ((*dir)->i_num == ROOT_INO) {
+		else if ((*dir)->i_num == ROOT_INO) 
+		{
 /* '..' over a mount-point results in 'dir' being exchanged for the mounted
    directory-inode. NOTE! We set mounted, so that we can iput the new dir */
 			sb=get_super((*dir)->i_dev);
-			if (sb->s_imount) {
+			if (sb->s_imount) 
+			{
 				iput(*dir);
 				(*dir)=sb->s_imount;
 				(*dir)->i_count++;
@@ -130,7 +133,8 @@ static struct buffer_head * find_entry(struct m_inode ** dir,
 		return NULL;
 	i = 0;
 	de = (struct dir_entry *) bh->b_data;
-	while (i < entries) {
+	while (i < entries)
+	{
 		if ((char *)de >= BLOCK_SIZE+bh->b_data) {
 			brelse(bh);
 			bh = NULL;
@@ -143,13 +147,13 @@ static struct buffer_head * find_entry(struct m_inode ** dir,
 		}
 		if (match(namelen,name,de)) {
 			*res_dir = de;
-			return bh;
+			return bh; // 찾은 경우
 		}
 		de++;
 		i++;
 	}
 	brelse(bh);
-	return NULL;
+	return NULL;// 못찾은 경우
 }
 
 /*
@@ -238,32 +242,51 @@ static struct m_inode * get_dir(const char * pathname)
 		panic("No root inode");
 	if (!current->pwd || !current->pwd->i_count)
 		panic("No cwd inode");
-	if ((c=get_fs_byte(pathname))=='/') {
+	// root 에서 파일을 읽으면(절대경로) /dev/tty0 
+	if ((c=get_fs_byte(pathname))=='/')
+	{
 		inode = current->root;
 		pathname++;
-	} else if (c)
+	// 상대경로 이면 ./home
+	} 
+	else if (c)
 		inode = current->pwd;
+	// 잘못 들어온거
 	else
 		return NULL;	/* empty name is bad */
+
 	inode->i_count++;
-	while (1) {
+
+	while (1)
+	{
 		thisname = pathname;
-		if (!S_ISDIR(inode->i_mode) || !permission(inode,MAY_EXEC)) {
+		if (!S_ISDIR(inode->i_mode) ||
+			!permission(inode,MAY_EXEC))
+		{
 			iput(inode);
 			return NULL;
 		}
+
+		// tty0
 		for(namelen=0;(c=get_fs_byte(pathname++))&&(c!='/');namelen++)
 			/* nothing */ ;
+		
+		//파일이면 
 		if (!c)
 			return inode;
-		if (!(bh = find_entry(&inode,thisname,namelen,&de))) {
+	
+		if (!(bh = find_entry(&inode,thisname,namelen,&de))) 
+		{
 			iput(inode);
 			return NULL;
 		}
+
 		inr = de->inode;
 		idev = inode->i_dev;
+
 		brelse(bh);
-		iput(inode);
+		iput(inode);//반납 
+		//하위 디렉터리의 아이노드를 찾는다.
 		if (!(inode = iget(idev,inr)))
 			return NULL;
 	}
@@ -284,10 +307,12 @@ static struct m_inode * dir_namei(const char * pathname,
 
 	if (!(dir = get_dir(pathname)))
 		return NULL;
+
 	basename = pathname;
 	while ((c=get_fs_byte(pathname++)))
 		if (c=='/')
 			basename=pathname;
+
 	*namelen = pathname-basename-1;
 	*name = basename;
 	return dir;
@@ -346,37 +371,49 @@ int open_namei(const char * pathname, int flag, int mode,
 	if ((flag & O_TRUNC) && !(flag & O_ACCMODE))
 		flag |= O_WRONLY;
 	mode &= 0777 & ~current->umask;
+	// 장치파일 일때 옵션
 	mode |= I_REGULAR;
 	if (!(dir = dir_namei(pathname,&namelen,&basename)))
 		return -ENOENT;
-	if (!namelen) {			/* special case: '/usr/' etc */
-		if (!(flag & (O_ACCMODE|O_CREAT|O_TRUNC))) {
+	if (!namelen) 
+	{			/* special case: '/usr/' etc */
+		if (!(flag & (O_ACCMODE|O_CREAT|O_TRUNC))) 
+		{
 			*res_inode=dir;
 			return 0;
 		}
 		iput(dir);
 		return -EISDIR;
 	}
+
 	bh = find_entry(&dir,basename,namelen,&de);
-	if (!bh) {
-		if (!(flag & O_CREAT)) {
+	if (!bh) 
+	{
+		if (!(flag & O_CREAT)) 
+		{
 			iput(dir);
 			return -ENOENT;
 		}
-		if (!permission(dir,MAY_WRITE)) {
+
+		if (!permission(dir,MAY_WRITE)) 
+		{
 			iput(dir);
 			return -EACCES;
 		}
+
 		inode = new_inode(dir->i_dev);
-		if (!inode) {
+		if (!inode) 
+		{
 			iput(dir);
 			return -ENOSPC;
 		}
+
 		inode->i_uid = current->euid;
 		inode->i_mode = mode;
 		inode->i_dirt = 1;
 		bh = add_entry(dir,basename,namelen,&de);
-		if (!bh) {
+		if (!bh) 
+		{
 			inode->i_nlinks--;
 			iput(inode);
 			iput(dir);

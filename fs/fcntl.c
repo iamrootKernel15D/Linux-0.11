@@ -29,6 +29,7 @@ static int dupfd(unsigned int fd, unsigned int arg)
 	if (arg >= NR_OPEN)
 		return -EMFILE;
 	current->close_on_exec &= ~(1<<arg);
+	// current->filp[fd] 카운트가 증가됨
 	(current->filp[arg] = current->filp[fd])->f_count++;
 	return arg;
 }

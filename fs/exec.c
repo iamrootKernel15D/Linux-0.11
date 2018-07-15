@@ -114,7 +114,8 @@ static unsigned long copy_strings(int argc,char ** argv,unsigned long *page,
 	old_fs = get_fs();
 	if (from_kmem==2)
 		set_fs(new_fs);
-	while (argc-- > 0) {
+	while (argc-- > 0) 
+	{
 		if (from_kmem == 1)
 			set_fs(new_fs);
 		if (!(tmp = (char *)get_fs_long(((unsigned long *)argv)+argc)))
@@ -179,6 +180,7 @@ static unsigned long change_ldt(unsigned long text_size,unsigned long * page)
 /*
  * 'do_execve()' executes a new program.
  */
+//TODO tmp 의 의미는 아직 알 수 없음..
 int do_execve(unsigned long * eip,long tmp,char * filename,
 	char ** argv, char ** envp)
 {
@@ -206,6 +208,7 @@ restart_interp:
 		retval = -EACCES;
 		goto exec_error2;
 	}
+
 	i = inode->i_mode;
 	e_uid = (i & S_ISUID) ? inode->i_uid : current->euid;
 	e_gid = (i & S_ISGID) ? inode->i_gid : current->egid;
@@ -213,17 +216,25 @@ restart_interp:
 		i >>= 6;
 	else if (current->egid == inode->i_gid)
 		i >>= 3;
-	if (!(i & 1) &&
-	    !((inode->i_mode & 0111) && suser())) {
+
+	if ( !(i & 1) &&
+	     !((inode->i_mode & 0111) && suser())) 
+	{
 		retval = -ENOEXEC;
 		goto exec_error2;
 	}
-	if (!(bh = bread(inode->i_dev,inode->i_zone[0]))) {
+
+	if (!(bh = bread(inode->i_dev,inode->i_zone[0]))) 
+	{
 		retval = -EACCES;
 		goto exec_error2;
 	}
+
 	ex = *((struct exec *) bh->b_data);	/* read exec-header */
-	if ((bh->b_data[0] == '#') && (bh->b_data[1] == '!') && (!sh_bang)) {
+	//쉘 스크립트
+	if ( (bh->b_data[0] == '#') && 
+	     (bh->b_data[1] == '!') && (!sh_bang) ) 
+	{
 		/*
 		 * This section does the #! interpretation.
 		 * Sorta complicated, but hopefully it will work.  -TYT
@@ -295,41 +306,59 @@ restart_interp:
 		set_fs(old_fs);
 		goto restart_interp;
 	}
+
 	brelse(bh);
-	if (N_MAGIC(ex) != ZMAGIC || ex.a_trsize || ex.a_drsize ||
+	//파일 헤더정보를 확인해서 쉘이 로딩 룰에 맞는지 확인한다.
+	if ( N_MAGIC(ex) != ZMAGIC || ex.a_trsize || ex.a_drsize ||
 		ex.a_text+ex.a_data+ex.a_bss>0x3000000 ||
-		inode->i_size < ex.a_text+ex.a_data+ex.a_syms+N_TXTOFF(ex)) {
+		inode->i_size < ex.a_text+ex.a_data+ex.a_syms+N_TXTOFF(ex)) 
+	{
 		retval = -ENOEXEC;
 		goto exec_error2;
 	}
-	if (N_TXTOFF(ex) != BLOCK_SIZE) {
+
+	//파일의 헤더 사이즈가 1024가 아니면 실행하지 않는다. 
+	if (N_TXTOFF(ex) != BLOCK_SIZE) 
+	{
 		printk("%s: N_TXTOFF != BLOCK_SIZE. See a.out.h.", filename);
 		retval = -ENOEXEC;
 		goto exec_error2;
 	}
-	if (!sh_bang) {
+
+	//쉘 스크립트가 아니면 
+	if (!sh_bang) 
+	{
 		p = copy_strings(envc,envp,page,p,0);
 		p = copy_strings(argc,argv,page,p,0);
-		if (!p) {
+		if (!p) 
+		{
 			retval = -ENOMEM;
 			goto exec_error2;
 		}
 	}
+
 /* OK, This is the point of no return */
 	if (current->executable)
 		iput(current->executable);
 	current->executable = inode;
+
 	for (i=0 ; i<32 ; i++)
 		current->sigaction[i].sa_handler = NULL;
 	for (i=0 ; i<NR_OPEN ; i++)
-		if ((current->close_on_exec>>i)&1)
+		//close_on_exec 는 exec 되면 바로 fd를 close한다.
+		if ((current->close_on_exec >> i)&1)
 			sys_close(i);
+
 	current->close_on_exec = 0;
+	//프로세스 1과 프로세스 2와의 관계를 끊는다.
 	free_page_tables(get_base(current->ldt[1]),get_limit(0x0f));
 	free_page_tables(get_base(current->ldt[2]),get_limit(0x17));
+
 	if (last_task_used_math == current)
 		last_task_used_math = NULL;
 	current->used_math = 0;
+
+	//프로세스 LDT를 변경한다.
 	p += change_ldt(ex.a_text,page)-MAX_ARG_PAGES*PAGE_SIZE;
 	p = (unsigned long) create_tables((char *)p,argc,envc);
 	current->brk = ex.a_bss +
@@ -350,4 +379,4 @@ exec_error1:
 	for (i=0 ; i<MAX_ARG_PAGES ; i++)
 		free_page(page[i]);
 	return(retval);
-}
+
