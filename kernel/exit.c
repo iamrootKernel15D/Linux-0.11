@@ -143,25 +143,40 @@ int sys_waitpid(pid_t pid,unsigned long * stat_addr, int options)
 	int flag, code;
 	struct task_struct ** p;
 
+	//추정1 스택 어드레스의 write의 권한 확인.
+	//추정2 커널모드에서 유저영역(Process1) 스택에 데이터를 사용
 	verify_area(stat_addr,4);
 repeat:
 	flag=0;
-	for(p = &LAST_TASK ; p > &FIRST_TASK ; --p) {
+	
+	//테스크를 전부 뒤지면서 기다릴 자식할 프로세스를 찾는다.
+	for(p = &LAST_TASK ; p > &FIRST_TASK ; --p) 
+	{
+		//프로세스가 없거나 찾은 프로세스가 현재 프로세스이면 
 		if (!*p || *p == current)
 			continue;
+		// 현재 프로세스가 찾은 프로세스의 부모가 아닌 경우 
 		if ((*p)->father != current->pid)
 			continue;
-		if (pid>0) {
+
+		if (pid>0) 
+		{
 			if ((*p)->pid != pid)
 				continue;
-		} else if (!pid) {
+		} 
+		else if (!pid) 
+		{
 			if ((*p)->pgrp != current->pgrp)
 				continue;
-		} else if (pid != -1) {
+		} 
+		else if (pid != -1) 
+		{
 			if ((*p)->pgrp != -pid)
 				continue;
 		}
-		switch ((*p)->state) {
+
+		switch ((*p)->state) 
+		{
 			case TASK_STOPPED:
 				if (!(options & WUNTRACED))
 					continue;
@@ -176,15 +191,20 @@ repeat:
 				put_fs_long(code,stat_addr);
 				return flag;
 			default:
+				// 아직 stop 되지 않은 child가 존재
+				//Running 상태
 				flag=1;
 				continue;
 		}
 	}
-	if (flag) {
+
+	if (flag) 
+	{
+		//자식이 종료되지 않더라도 리턴
 		if (options & WNOHANG)
 			return 0;
 		current->state=TASK_INTERRUPTIBLE;
-		schedule();
+		schedule();// 종료 될때까지 스케쥴 프로세스 2로 전환 
 		if (!(current->signal &= ~(1<<(SIGCHLD-1))))
 			goto repeat;
 		else
