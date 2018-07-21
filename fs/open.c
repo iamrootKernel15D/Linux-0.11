@@ -148,26 +148,35 @@ int sys_open(const char * filename,int flag,int mode)
 	if (fd>=NR_OPEN)
 		return -EINVAL;
 	current->close_on_exec &= ~(1<<fd);
+	// 시작주소
 	f=0+file_table;
 	for (i=0 ; i<NR_FILE ; i++,f++)
 		if (!f->f_count) break;
 	if (i>=NR_FILE)
 		return -EINVAL;
+	// flip : 파일 포인터, fd : 파일 디스크립터
 	(current->filp[fd]=f)->f_count++;
-	if ((i=open_namei(filename,flag,mode,&inode))<0) {
+	if ((i=open_namei(filename,flag,mode,&inode))<0) 
+	{
 		current->filp[fd]=NULL;
 		f->f_count=0;
 		return i;
 	}
 /* ttys are somewhat special (ttyxx major==4, tty major==5) */
-	if (S_ISCHR(inode->i_mode)) {
-		if (MAJOR(inode->i_zone[0])==4) {
-			if (current->leader && current->tty<0) {
+	if (S_ISCHR(inode->i_mode)) 
+	{
+		if (MAJOR(inode->i_zone[0])==4) 
+		{
+			if (current->leader && current->tty<0) 
+			{
+				//왜 설정하는 지는 아직 알 수 없다.. 
 				current->tty = MINOR(inode->i_zone[0]);
 				tty_table[current->tty].pgrp = current->pgrp;
 			}
-		} else if (MAJOR(inode->i_zone[0])==5)
-			if (current->tty<0) {
+		} 
+		else if (MAJOR(inode->i_zone[0])==5)
+			if (current->tty<0) 
+			{
 				iput(inode);
 				current->filp[fd]=NULL;
 				f->f_count=0;
@@ -202,8 +211,10 @@ int sys_close(unsigned int fd)
 	current->filp[fd] = NULL;
 	if (filp->f_count == 0)
 		panic("Close: file count is 0");
+	 
 	if (--filp->f_count)
 		return (0);
+
 	iput(filp->f_inode);
 	return (0);
 }
