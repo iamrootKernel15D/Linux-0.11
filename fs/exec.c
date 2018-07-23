@@ -51,20 +51,26 @@ static unsigned long * create_tables(char * p,int argc,int envc)
 	sp = (unsigned long *) (0xfffffffc & (unsigned long) p);
 	sp -= envc+1;
 	envp = sp;
+	//sp = sp - ((int)argc + 1);
 	sp -= argc+1;
 	argv = sp;
+    //__asm__ ("movl %0,%%fs:%1"::"r" (val),"m" (*addr));
 	put_fs_long((unsigned long)envp,--sp);
 	put_fs_long((unsigned long)argv,--sp);
 	put_fs_long((unsigned long)argc,--sp);
 	while (argc-->0) {
 		put_fs_long((unsigned long) p,argv++);
+		// pass to next argv
 		while (get_fs_byte(p++)) /* nothing */ ;
 	}
+	// separater (blank)
 	put_fs_long(0,argv);
 	while (envc-->0) {
 		put_fs_long((unsigned long) p,envp++);
+		// pass to next envp
 		while (get_fs_byte(p++)) /* nothing */ ;
 	}
+	// separater (blank)
 	put_fs_long(0,envp);
 	return sp;
 }
@@ -118,31 +124,39 @@ static unsigned long copy_strings(int argc,char ** argv,unsigned long *page,
 	{
 		if (from_kmem == 1)
 			set_fs(new_fs);
+		//argv[argc] -> tmp로
 		if (!(tmp = (char *)get_fs_long(((unsigned long *)argv)+argc)))
 			panic("argc is wrong");
 		if (from_kmem == 1)
 			set_fs(old_fs);
 		len=0;		/* remember zero-padding */
-		do {
+
+		//len StringLength
+		do 
+		{
 			len++;
 		} while (get_fs_byte(tmp++));
-		if (p-len < 0) {	/* this shouldn't happen - 128kB */
+        // 페이지를 할당 받는 공간으로 추측
+
+		if (p-len < 0) 
+		{	/* this shouldn't happen - 128kB */
 			set_fs(old_fs);
 			return 0;
 		}
-		while (len) {
+		//argv[argc] 를 페이지 할당 받은 후 복사하는 부분
+		while (len) 
+		{
 			--p; --tmp; --len;
-			if (--offset < 0) {
-				offset = p % PAGE_SIZE;
+			if (--offset < 0) 
+			{
+				offset = p % PAGE_SIZE;//offset 4091
 				if (from_kmem==2)
 					set_fs(old_fs);
 				if (!(pag = (char *) page[p/PAGE_SIZE]) &&
-				    !(pag = (char *) (page[p/PAGE_SIZE] =
-				      get_free_page()))) 
+				    !(pag = (char *) (page[p/PAGE_SIZE] = get_free_page())) ) 
 					return 0;
 				if (from_kmem==2)
 					set_fs(new_fs);
-
 			}
 			*(pag + offset) = get_fs_byte(tmp);
 		}
@@ -157,9 +171,11 @@ static unsigned long change_ldt(unsigned long text_size,unsigned long * page)
 	unsigned long code_limit,data_limit,code_base,data_base;
 	int i;
 
+	//code_limit을 4K 단위로 맞춘다.
 	code_limit = text_size+PAGE_SIZE -1;
 	code_limit &= 0xFFFFF000;
-	data_limit = 0x4000000;
+	// 베이스 어드레스를 프로세스 nr * 64M, 119p 참조 
+	data_limit = 0x4000000;//64M
 	code_base = get_base(current->ldt[1]);
 	data_base = code_base;
 	set_base(current->ldt[1],code_base);
@@ -167,6 +183,7 @@ static unsigned long change_ldt(unsigned long text_size,unsigned long * page)
 	set_base(current->ldt[2],data_base);
 	set_limit(current->ldt[2],data_limit);
 /* make sure fs points to the NEW data segment */
+	//fs = 0x17
 	__asm__("pushl $0x17\n\tpop %%fs"::);
 	data_base += data_limit;
 	for (i=MAX_ARG_PAGES-1 ; i>=0 ; i--) {
@@ -192,13 +209,16 @@ int do_execve(unsigned long * eip,long tmp,char * filename,
 	int e_uid, e_gid;
 	int retval;
 	int sh_bang = 0;
+	//4096 * 32 - 4 : -4를 빼는 이유?
+	//PAGE_SIZE 
+	//TODO 
 	unsigned long p=PAGE_SIZE*MAX_ARG_PAGES-4;
 
 	if ((0xffff & eip[1]) != 0x000f)
 		panic("execve called from supervisor mode");
 	for (i=0 ; i<MAX_ARG_PAGES ; i++)	/* clear page-table */
-		page[i]=0;
-	if (!(inode=namei(filename)))		/* get executables inode */
+		page[i]=0;// 파라미터와 환경 변수 저장에 사용되는 페이지 초기화
+	if (!(inode=namei(filename)))		/* get executables inode */ 
 		return -ENOENT;
 	argc = count(argv);
 	envc = count(envp);
@@ -208,7 +228,7 @@ restart_interp:
 		retval = -EACCES;
 		goto exec_error2;
 	}
-
+	// 실행 권한이 있는지 확인
 	i = inode->i_mode;
 	e_uid = (i & S_ISUID) ? inode->i_uid : current->euid;
 	e_gid = (i & S_ISGID) ? inode->i_gid : current->egid;
@@ -309,8 +329,8 @@ restart_interp:
 
 	brelse(bh);
 	//파일 헤더정보를 확인해서 쉘이 로딩 룰에 맞는지 확인한다.
-	if ( N_MAGIC(ex) != ZMAGIC || ex.a_trsize || ex.a_drsize ||
-		ex.a_text+ex.a_data+ex.a_bss>0x3000000 ||
+	if ( N_MAGIC(ex) != ZMAGIC || ex.a_trsize || ex.a_drsize ||//재배치되는 텍스트 사이즈(trsize)
+		ex.a_text+ex.a_data+ex.a_bss>0x3000000 ||//0x3000000 = 48MB = 3x16MB 숫자의 의미 : 0.11버젼?
 		inode->i_size < ex.a_text+ex.a_data+ex.a_syms+N_TXTOFF(ex)) 
 	{
 		retval = -ENOEXEC;
@@ -327,7 +347,7 @@ restart_interp:
 
 	//쉘 스크립트가 아니면 
 	if (!sh_bang) 
-	{
+	{ 
 		p = copy_strings(envc,envp,page,p,0);
 		p = copy_strings(argc,argv,page,p,0);
 		if (!p) 
@@ -351,9 +371,12 @@ restart_interp:
 
 	current->close_on_exec = 0;
 	//프로세스 1과 프로세스 2와의 관계를 끊는다.
+	//코드 세그먼트 영역을 초기화.
 	free_page_tables(get_base(current->ldt[1]),get_limit(0x0f));
+	//데이터 세그먼트 영역을 초기화.
 	free_page_tables(get_base(current->ldt[2]),get_limit(0x17));
 
+	//coprocess
 	if (last_task_used_math == current)
 		last_task_used_math = NULL;
 	current->used_math = 0;
@@ -368,6 +391,7 @@ restart_interp:
 	current->euid = e_uid;
 	current->egid = e_gid;
 	i = ex.a_text+ex.a_data;
+	//메인메모리 BSS 세그먼트페이지 데이터를 0 으로 초기화
 	while (i&0xfff)
 		put_fs_byte(0,(char *) (i++));
 	eip[0] = ex.a_entry;		/* eip, magic happens :-) */
@@ -379,4 +403,4 @@ exec_error1:
 	for (i=0 ; i<MAX_ARG_PAGES ; i++)
 		free_page(page[i]);
 	return(retval);
-
+	}

@@ -108,18 +108,24 @@ int free_page_tables(unsigned long from,unsigned long size)
 {
 	unsigned long *pg_table;
 	unsigned long * dir, nr;
-
+	/// 0x3fffff 는 4MB로 페이지 테이블이 관리할 수 있는 영역
 	if (from & 0x3fffff)
 		panic("free_page_tables called with wrong alignment");
 	if (!from)
 		panic("Trying to free up swapper memory space");
 	size = (size + 0x3fffff) >> 22;
+	//페이지 디렉터리 인덱스  
 	dir = (unsigned long *) ((from>>20) & 0xffc); /* _pg_dir = 0 */
+
+	//size 페이지 디렉터리의 개수 
 	for ( ; size-->0 ; dir++) {
 		if (!(1 & *dir))
 			continue;
+
+		//페이지 테이블 아이템 
 		pg_table = (unsigned long *) (0xfffff000 & *dir);
-		for (nr=0 ; nr<1024 ; nr++) {
+		for (nr=0 ; nr<1024 ; nr++) 
+		{
 			if (1 & *pg_table)
 				free_page(0xfffff000 & *pg_table);
 			*pg_table = 0;
