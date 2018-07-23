@@ -102,6 +102,8 @@ void free_page(unsigned long addr)
  * This function frees a continuos block of page tables, as needed
  * by 'exit()'. As does copy_page_tables(), this handles only 4Mb blocks.
  */
+// 31                 22 21              12 11         0
+// |페이지디렉토리아이템|페이지테이블아이템|페이지오프셋|
 int free_page_tables(unsigned long from,unsigned long size)
 {
 	unsigned long *pg_table;
