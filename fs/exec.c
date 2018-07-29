@@ -194,12 +194,16 @@ int do_execve(unsigned long * eip,long tmp,char * filename,
 	int sh_bang = 0;
 	unsigned long p=PAGE_SIZE*MAX_ARG_PAGES-4;
 
+    // check code segment, 권한 체크
 	if ((0xffff & eip[1]) != 0x000f)
 		panic("execve called from supervisor mode");
+
 	for (i=0 ; i<MAX_ARG_PAGES ; i++)	/* clear page-table */
 		page[i]=0;
+
 	if (!(inode=namei(filename)))		/* get executables inode */
 		return -ENOENT;
+
 	argc = count(argv);
 	envc = count(envp);
 	
@@ -210,6 +214,7 @@ restart_interp:
 	}
 
 	i = inode->i_mode;
+    // 권한 체크
 	e_uid = (i & S_ISUID) ? inode->i_uid : current->euid;
 	e_gid = (i & S_ISGID) ? inode->i_gid : current->egid;
 	if (current->euid == inode->i_uid)
@@ -358,12 +363,15 @@ restart_interp:
 		last_task_used_math = NULL;
 	current->used_math = 0;
 
-	//프로세스 LDT를 변경한다.
+	//프로세스 LDT를 변경한다a
+    // p = MAX_ARG_PAGES*PAGE_SIZE - 사용한 size
+    // p = p + 64MB -MAX_ARG_PAGES*PAGE_SIZE
+    // p = 64MB - 사용한 size
 	p += change_ldt(ex.a_text,page)-MAX_ARG_PAGES*PAGE_SIZE;
+    // 파라미터와환경벼수 관리 포인터 테이블을 프로세스 스택공간에 만든다.
 	p = (unsigned long) create_tables((char *)p,argc,envc);
 	current->brk = ex.a_bss +
-		(current->end_data = ex.a_data +
-		(current->end_code = ex.a_text));
+		( current->end_data = ex.a_data + (current->end_code = ex.a_text) );
 	current->start_stack = p & 0xfffff000;
 	current->euid = e_uid;
 	current->egid = e_gid;
@@ -379,4 +387,4 @@ exec_error1:
 	for (i=0 ; i<MAX_ARG_PAGES ; i++)
 		free_page(page[i]);
 	return(retval);
-
+}

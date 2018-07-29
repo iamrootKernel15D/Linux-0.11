@@ -204,17 +204,28 @@ unsigned long put_page(unsigned long page,unsigned long address)
 
 	if (page < LOW_MEM || page >= HIGH_MEMORY)
 		printk("Trying to put page %p at %p\n",page,address);
+
 	if (mem_map[(page-LOW_MEM)>>12] != 1)
 		printk("mem_map disagrees with %p at %p\n",page,address);
+ 
+    // address 에서 페이지 디렉토리 테이블 엔트리를 계산
 	page_table = (unsigned long *) ((address>>20) & 0xffc);
+
+    // 페이지 디렉토리 엔드리가 페이지 테이블를 가지고 있으면
 	if ((*page_table)&1)
+    {
+        // 헤이지 테이블 어드레스를 구함
 		page_table = (unsigned long *) (0xfffff000 & *page_table);
-	else {
+    }
+	else 
+    {
 		if (!(tmp=get_free_page()))
 			return 0;
 		*page_table = tmp|7;
 		page_table = (unsigned long *) tmp;
 	}
+
+    // 페이지와 페이지 테이블 관계를 만들고 맵핑
 	page_table[(address>>12) & 0x3ff] = page | 7;
 /* no need for invalidate */
 	return page;
@@ -277,6 +288,8 @@ void get_empty_page(unsigned long address)
 {
 	unsigned long tmp;
 
+    // 1. free page 를 얻어온다.
+    // 2. free page 를 선형 주소와 매핑 시킨다.
 	if (!(tmp=get_free_page()) || !put_page(tmp,address)) {
 		free_page(tmp);		/* 0 is ok - ignored */
 		oom();
@@ -350,18 +363,29 @@ static int share_page(unsigned long address)
 
 	if (!current->executable)
 		return 0;
+
+    // 공유하려는 실행 파일이 하나만 수행중
 	if (current->executable->i_count < 2)
 		return 0;
-	for (p = &LAST_TASK ; p > &FIRST_TASK ; --p) {
+    
+	for (p = &LAST_TASK ; p > &FIRST_TASK ; --p) 
+    {
+        // task 가 비어 있으면 
 		if (!*p)
 			continue;
+
+        // 현재 task 이면 
 		if (current == *p)
 			continue;
+
+        // 다른 실행 파일 이면
 		if ((*p)->executable != current->executable)
 			continue;
+
 		if (try_to_share(address,*p))
 			return 1;
 	}
+
 	return 0;
 }
 
@@ -374,27 +398,40 @@ void do_no_page(unsigned long error_code,unsigned long address)
 
 	address &= 0xfffff000;
 	tmp = address - current->start_code;
-	if (!current->executable || tmp >= current->end_data) {
-		get_empty_page(address);
+	if (!current->executable || tmp >= current->end_data) 
+    {
+        // 로딩이 필요한 것이 아니다.
+		get_empty_page(address);    // 스택이 부족한 경우라면 페이지를 새로 할당 
 		return;
 	}
+    
+    // 다른 프로세스의 메모리를 공유 받는다.
 	if (share_page(tmp))
 		return;
+
 	if (!(page = get_free_page()))
 		oom();
+
 /* remember that 1 block is used for header */
-	block = 1 + tmp/BLOCK_SIZE;
-	for (i=0 ; i<4 ; block++,i++)
+	block = 1 + tmp/BLOCK_SIZE;     // block = 읽고 싶은 메모리 주소가 위치한 block 위치
+	for (i=0 ; i<4 ; block++,i++)   // 4 -> 한block 이 1024 이고 page 가 4096 이라서 4번 읽어야 page에 데이터를 채움
 		nr[i] = bmap(current->executable,block);
+
 	bread_page(page,current->executable->i_dev,nr);
+
+    // 나머지 공간에 0으로 초기화
 	i = tmp + 4096 - current->end_data;
 	tmp = page + 4096;
 	while (i-- > 0) {
 		tmp--;
 		*(char *)tmp = 0;
 	}
+
+    // page 를 선형address 와 연결
 	if (put_page(page,address))
 		return;
+    
+    // 에러처리
 	free_page(page);
 	oom();
 }

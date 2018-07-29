@@ -145,19 +145,24 @@ int sys_open(const char * filename,int flag,int mode)
 	for(fd=0 ; fd<NR_OPEN ; fd++)
 		if (!current->filp[fd])
 			break;
+
 	if (fd>=NR_OPEN)
 		return -EINVAL;
 	current->close_on_exec &= ~(1<<fd);
+
 	// 시작주소
 	f=0+file_table;
 	for (i=0 ; i<NR_FILE ; i++,f++)
 		if (!f->f_count) break;
+
 	if (i>=NR_FILE)
 		return -EINVAL;
-	// flip : 파일 포인터, fd : 파일 디스크립터
+
+	// filp : 파일 포인터, fd : 파일 디스크립터
 	(current->filp[fd]=f)->f_count++;
 	if ((i=open_namei(filename,flag,mode,&inode))<0) 
 	{
+        // 여기서 i 는 성공, 실패(에러코드)
 		current->filp[fd]=NULL;
 		f->f_count=0;
 		return i;
@@ -186,11 +191,13 @@ int sys_open(const char * filename,int flag,int mode)
 /* Likewise with block-devices: check for floppy_change */
 	if (S_ISBLK(inode->i_mode))
 		check_disk_change(inode->i_zone[0]);
+
 	f->f_mode = inode->i_mode;
 	f->f_flags = flag;
 	f->f_count = 1;
 	f->f_inode = inode;
 	f->f_pos = 0;
+
 	return (fd);
 }
 

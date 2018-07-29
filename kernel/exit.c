@@ -34,12 +34,20 @@ void release(struct task_struct * p)
 
 static inline int send_sig(long sig,struct task_struct * p,int priv)
 {
+    // validate
 	if (!p || sig<1 || sig>32)
 		return -EINVAL;
+
+    // 권한 체크
 	if (priv || (current->euid==p->euid) || suser())
+    {
 		p->signal |= (1<<(sig-1));
+    }
 	else
+    {
 		return -EPERM;
+    }
+
 	return 0;
 }
 
@@ -47,9 +55,13 @@ static void kill_session(void)
 {
 	struct task_struct **p = NR_TASKS + task;
 	
-	while (--p > &FIRST_TASK) {
+	while (--p > &FIRST_TASK) 
+    {
 		if (*p && (*p)->session == current->session)
+        {
+            // SIGHUP : 터미널이 연결 종료될때 발생
 			(*p)->signal |= 1<<(SIGHUP-1);
+        }
 	}
 }
 
@@ -85,14 +97,19 @@ static void tell_father(int pid)
 	int i;
 
 	if (pid)
-		for (i=0;i<NR_TASKS;i++) {
+    {
+		for (i=0;i<NR_TASKS;i++) 
+        {
 			if (!task[i])
 				continue;
 			if (task[i]->pid != pid)
 				continue;
+
+            // 부모에게 sigchild signal
 			task[i]->signal |= (1<<(SIGCHLD-1));
 			return;
 		}
+    }
 /* if we don't find any fathers, we just release ourselves */
 /* This is not really OK. Must change it to make father 1 */
 	printk("BAD BAD - no father found\n\r");
@@ -102,34 +119,61 @@ static void tell_father(int pid)
 int do_exit(long code)
 {
 	int i;
+
+    // 코드와 데이터 세그먼트가 있던 페이지를 해제 한다.
 	free_page_tables(get_base(current->ldt[1]),get_limit(0x0f));
 	free_page_tables(get_base(current->ldt[2]),get_limit(0x17));
+
+    // 자식들 먼저 처리
 	for (i=0 ; i<NR_TASKS ; i++)
-		if (task[i] && task[i]->father == current->pid) {
-			task[i]->father = 1;
+    {
+		if (task[i] && task[i]->father == current->pid) 
+        {
+            // init 으로 부모를 변경
+            task[i]->father = 1;
+            // 자식이 좀비이면
 			if (task[i]->state == TASK_ZOMBIE)
+            {
+                // sigchild 를 inti 에 signal 발생
 				/* assumption task[1] is always init */
 				(void) send_sig(SIGCHLD, task[1], 1);
+            }
 		}
+    }
+    
+    // 파일 close
 	for (i=0 ; i<NR_OPEN ; i++)
+    {
 		if (current->filp[i])
 			sys_close(i);
+    }
+
 	iput(current->pwd);
 	current->pwd=NULL;
 	iput(current->root);
 	current->root=NULL;
 	iput(current->executable);
 	current->executable=NULL;
+
 	if (current->leader && current->tty >= 0)
 		tty_table[current->tty].pgrp = 0;
+
 	if (last_task_used_math == current)
 		last_task_used_math = NULL;
+
 	if (current->leader)
 		kill_session();
+
 	current->state = TASK_ZOMBIE;
+
+    // exit code 를 설정
 	current->exit_code = code;
+    
+    // sigchild 를 부모에게 전달 
 	tell_father(current->father);
+
 	schedule();
+
 	return (-1);	/* just to suppress warnings */
 }
 
@@ -187,8 +231,8 @@ repeat:
 				current->cstime += (*p)->stime;
 				flag = (*p)->pid;
 				code = (*p)->exit_code;
-				release(*p);
-				put_fs_long(code,stat_addr);
+				release(*p);                 // 자식 Task를 해제
+				put_fs_long(code,stat_addr); // code 를 user 영역으로
 				return flag;
 			default:
 				// 아직 stop 되지 않은 child가 존재
@@ -203,13 +247,19 @@ repeat:
 		//자식이 종료되지 않더라도 리턴
 		if (options & WNOHANG)
 			return 0;
+
 		current->state=TASK_INTERRUPTIBLE;
 		schedule();// 종료 될때까지 스케쥴 프로세스 2로 전환 
+
+        // sigchild 
+        // check -> clear
+		//if (!(current->signal = (current->signal & ~(1<<(SIGCHLD-1)))))
 		if (!(current->signal &= ~(1<<(SIGCHLD-1))))
 			goto repeat;
 		else
 			return -EINTR;
 	}
+
 	return -ECHILD;
 }
 
