@@ -229,6 +229,7 @@ struct buffer_head * get_hash_table(int dev, int block)
  */
 // buffer_head 를 할당받거나
 // 같은 dev, block 정보를 가지는 buffer_head 를 받는다.
+// 이 함수는 실패 되지 않는다.
 struct buffer_head * getblk(int dev,int block)
 {
 	struct buffer_head * tmp, * bh;
@@ -351,20 +352,42 @@ void bread_page(unsigned long address,int dev,int b[4])
 	struct buffer_head * bh[4];
 	int i;
 
+    // 데이터 읽기
 	for (i=0 ; i<4 ; i++)
-		if (b[i]) {
+    {
+		if (b[i])  // 읽을 데이터가 있으면 
+        {
 			if ((bh[i] = getblk(dev,b[i])))
-				if (!bh[i]->b_uptodate)
+            {
+				if (!bh[i]->b_uptodate) // 데이터를 채워넣어야 하면
+                {
 					ll_rw_block(READ,bh[i]);
-		} else
+                }
+            }
+            else
+            {
+                /* 이 부분은 실행 할수 없다. */
+            }
+		} 
+        else
 			bh[i] = NULL;
+    }
+
+    // 읽은 데이터를 주소에 복사
 	for (i=0 ; i<4 ; i++,address += BLOCK_SIZE)
-		if (bh[i]) {
+    {
+		if (bh[i]) 
+        {
 			wait_on_buffer(bh[i]);
+
 			if (bh[i]->b_uptodate)
+            {
 				COPYBLK((unsigned long) bh[i]->b_data,address);
+            }
+
 			brelse(bh[i]);
 		}
+    }
 }
 
 /*

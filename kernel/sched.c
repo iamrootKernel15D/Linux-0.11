@@ -109,19 +109,27 @@ void schedule(void)
 /* check alarm, wake up any interruptible tasks that have got a signal */
 
 	for(p = &LAST_TASK ; p > &FIRST_TASK ; --p)
-		if (*p) {
-			if ((*p)->alarm && (*p)->alarm < jiffies) {
-					(*p)->signal |= (1<<(SIGALRM-1));
-					(*p)->alarm = 0;
-				}
-			if (((*p)->signal & ~(_BLOCKABLE & (*p)->blocked)) &&
-			(*p)->state==TASK_INTERRUPTIBLE)
+    {
+		if (*p) 
+        {
+            if ((*p)->alarm && (*p)->alarm < jiffies) 
+            {
+                (*p)->signal |= (1<<(SIGALRM-1));
+                (*p)->alarm = 0;
+            }
+
+            if ( ( (*p)->signal & ~(_BLOCKABLE & (*p)->blocked) ) &&
+                 ( (*p)->state == TASK_INTERRUPTIBLE ) )
+            {
 				(*p)->state=TASK_RUNNING;
+            }
 		}
+    }
 
 /* this is the scheduler proper: */
 
-	while (1) {
+	while (1) 
+    {
 		c = -1;
 		next = 0;
 		i = NR_TASKS;

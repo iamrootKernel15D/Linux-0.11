@@ -196,29 +196,42 @@ void init(void)
 		static char * envp_rc[] = { "HOME=/", NULL };
 		*/
 		execve("/bin/sh",argv_rc,envp_rc);
-		_exit(2);
+		_exit(2);   // 호출되지 않음
 	}
 
 	if (pid>0)
+    {
 		while (pid != wait(&i))
 			/* nothing */;
+    }
+
 	while (1) 
 	{
-		if ((pid=fork())<0) {
+		if ((pid=fork())<0) 
+        {
 			printf("Fork failed in init\r\n");
 			continue;
 		}
-		if (!pid) {
-			close(0);close(1);close(2);
+        
+		if (!pid) 
+        {
+			close(0);   // stdin
+            close(1);   // stdout
+            close(2);   // stderr
+
 			setsid();
-			(void) open("/dev/tty0",O_RDWR,0);
-			(void) dup(0);
-			(void) dup(0);
+			(void) open("/dev/tty0",O_RDWR,0);  // stdin
+			(void) dup(0);                      // stdout
+			(void) dup(0);                      // stderr
 			_exit(execve("/bin/sh",argv,envp));
 		}
+
 		while (1)
+        {
 			if (pid == wait(&i))
 				break;
+        }
+
 		printf("\n\rchild %d died with code %04x\n\r",pid,i);
 		sync();
 	}
