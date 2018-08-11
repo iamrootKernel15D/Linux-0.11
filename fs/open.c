@@ -141,6 +141,7 @@ int sys_open(const char * filename,int flag,int mode)
 	struct file * f;
 	int i,fd;
 
+	//8진수  
 	mode &= 0777 & ~current->umask;
 	for(fd=0 ; fd<NR_OPEN ; fd++)
 		if (!current->filp[fd])
@@ -150,15 +151,16 @@ int sys_open(const char * filename,int flag,int mode)
 		return -EINVAL;
 	current->close_on_exec &= ~(1<<fd);
 
-	// 시작주소
+	// 시작주소 
 	f=0+file_table;
 	for (i=0 ; i<NR_FILE ; i++,f++)
-		if (!f->f_count) break;
+		if (!f->f_count) //TODO f_count 의 의미는 무엇인가? 
+			 break;
 
 	if (i>=NR_FILE)
 		return -EINVAL;
 
-	// filp : 파일 포인터, fd : 파일 디스크립터
+	// filp : 파일 포인터 배열, fd : 파일 디스크립터
 	(current->filp[fd]=f)->f_count++;
 	if ((i=open_namei(filename,flag,mode,&inode))<0) 
 	{
@@ -167,7 +169,8 @@ int sys_open(const char * filename,int flag,int mode)
 		f->f_count=0;
 		return i;
 	}
-/* ttys are somewhat special (ttyxx major==4, tty major==5) */
+
+	/* ttys are somewhat special (ttyxx major==4, tty major==5) */
 	if (S_ISCHR(inode->i_mode)) 
 	{
 		if (MAJOR(inode->i_zone[0])==4) 

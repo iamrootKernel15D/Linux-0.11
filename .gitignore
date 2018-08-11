@@ -6,6 +6,7 @@ Thumbs.db
 *.a
 *.img*
 
+.gdb_history
 hdc-0.11.img
 Image
 System.map

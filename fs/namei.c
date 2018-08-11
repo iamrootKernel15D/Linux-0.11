@@ -66,8 +66,11 @@ static int match(int len,const char * name,struct dir_entry * de)
 
 	if (!de || !de->inode || len > NAME_LEN)
 		return 0;
+	// 내가 찾을 글자 수 이상 데이터가 존재하면 
 	if (len < NAME_LEN && de->name[len])
 		return 0;
+
+	//TODO 어셈 해석 불가. 의미는 대충 파악 
 	__asm__("cld\n\t"
 		"fs ; repe ; cmpsb\n\t"
 		"setz %%al"
@@ -98,22 +101,25 @@ static struct buffer_head * find_entry(struct m_inode ** dir,
 	struct super_block * sb;
 
 #ifdef NO_TRUNCATE
-	if (namelen > NAME_LEN)
+	if (namelen > NAME_LEN) //파일명 길이가 14가 넘으면 null로 
 		return NULL;
 #else
-	if (namelen > NAME_LEN)
+	if (namelen > NAME_LEN) //파일명 길이가 14가 넘으면 14로 
 		namelen = NAME_LEN;
 #endif
+
+	//TODO i_size ... 
 	entries = (*dir)->i_size / (sizeof (struct dir_entry));
 	*res_dir = NULL;
 	if (!namelen)
 		return NULL;
 /* check for '..', as we might have to do some "magic" for it */
+	// .. 이면 예시 /mnt/a/g/.. 
 	if (namelen==2 && get_fs_byte(name)=='.' && get_fs_byte(name+1)=='.') 
 	{
-/* '..' in a pseudo-root results in a faked '.' (just change namelen) */
+		/* '..' in a pseudo-root results in a faked '.' (just change namelen) */
 		if ((*dir) == current->root)
-			namelen=1;
+			namelen=1; // 내가 루트인데 .. 을 주면 . 으로 변경
 		else if ((*dir)->i_num == ROOT_INO) 
 		{
 /* '..' over a mount-point results in 'dir' being exchanged for the mounted
@@ -127,6 +133,7 @@ static struct buffer_head * find_entry(struct m_inode ** dir,
 			}
 		}
 	}
+
 	if (!(block = (*dir)->i_zone[0]))
 		return NULL;
 	if (!(bh = bread((*dir)->i_dev,block)))
@@ -135,11 +142,14 @@ static struct buffer_head * find_entry(struct m_inode ** dir,
 	de = (struct dir_entry *) bh->b_data;
 	while (i < entries)
 	{
-		if ((char *)de >= BLOCK_SIZE+bh->b_data) {
+		//현재 논리 븐럭에서 원하는 디렉토리 엔트리를 찾지 못하면 
+		if ( (char *)de >= BLOCK_SIZE+bh->b_data ) 
+		{
 			brelse(bh);
 			bh = NULL;
 			if (!(block = bmap(*dir,i/DIR_ENTRIES_PER_BLOCK)) ||
-			    !(bh = bread((*dir)->i_dev,block))) {
+			    !(bh = bread((*dir)->i_dev,block))) 
+			{
 				i += DIR_ENTRIES_PER_BLOCK;
 				continue;
 			}
@@ -238,8 +248,10 @@ static struct m_inode * get_dir(const char * pathname)
 	int namelen,inr,idev;
 	struct dir_entry * de;
 
+	//현재 루트 i-node가 없거나 참조 카운터가 0인 경우 
 	if (!current->root || !current->root->i_count)
 		panic("No root inode");
+	//현재 디렉토리의 i-node가 없거나 참조 카운터가 0인 경우 
 	if (!current->pwd || !current->pwd->i_count)
 		panic("No cwd inode");
 	// root 에서 파일을 읽으면(절대경로) /dev/tty0 
@@ -257,7 +269,7 @@ static struct m_inode * get_dir(const char * pathname)
 
 	inode->i_count++;
 
-	while (1)
+	while (1) //최종 디렉터리를 찾을 때 까지 반복 한다.
 	{
 		thisname = pathname;
 		if (!S_ISDIR(inode->i_mode) ||
@@ -267,13 +279,14 @@ static struct m_inode * get_dir(const char * pathname)
 			return NULL;
 		}
 
-		// tty0
-		for(namelen=0;(c=get_fs_byte(pathname++))&&(c!='/');namelen++)
+		// mnt/user/user1/user2/hello.tx1 
+		// for 수행 후 > user/user1/user2/hello.tx1 
+		for(namelen=0; (c=get_fs_byte(pathname++)) && (c!='/'); namelen++)
 			/* nothing */ ;
 		
 		//파일이면 
 		if (!c)
-			return inode;
+			return inode; //디렉터리의 아이노드
 	
 		if (!(bh = find_entry(&inode,thisname,namelen,&de))) 
 		{
@@ -367,16 +380,22 @@ int open_namei(const char * pathname, int flag, int mode,
 	struct m_inode * dir, *inode;
 	struct buffer_head * bh;
 	struct dir_entry * de;
-
+	
+	//파일이 읽기 전용이고, 파일 크기가 0(기존파일 제거 플래그)
+	//이면 쓰기전용으로 설정한다. 
 	if ((flag & O_TRUNC) && !(flag & O_ACCMODE))
-		flag |= O_WRONLY;
+		flag |= O_WRONLY; //쓰기 전용모드 
+
 	mode &= 0777 & ~current->umask;
-	// 장치파일 일때 옵션
+	//일반 파일로 설정한다. 
 	mode |= I_REGULAR;
+	//dir_namei 에서 최종 디렉터리를 가져온다. 
 	if (!(dir = dir_namei(pathname,&namelen,&basename)))
 		return -ENOENT;
-	if (!namelen) 
+	
+	if (!namelen) //파일이 아닌 디렉토리인 경우.
 	{			/* special case: '/usr/' etc */
+		//추정 디렉터리 오픈 시 하위 3개 플래그를 사용하면 안됨
 		if (!(flag & (O_ACCMODE|O_CREAT|O_TRUNC))) 
 		{
 			*res_inode=dir;

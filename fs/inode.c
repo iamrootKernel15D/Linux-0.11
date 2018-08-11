@@ -272,7 +272,7 @@ struct m_inode * iget(int dev,int nr)
 			inode++;
 			continue;
 		}
-        // lock 대기
+        // lock 이 풀릴 때 까지 대기
 		wait_on_inode(inode);
         // 같은 inode 비교
 		if (inode->i_dev != dev || inode->i_num != nr) {
@@ -281,13 +281,15 @@ struct m_inode * iget(int dev,int nr)
 		}
 
 		inode->i_count++;       // 참조 카운트 증가
-		if (inode->i_mount) {
+		if (inode->i_mount) 
+		{
 			int i;
 
 			for (i = 0 ; i<NR_SUPER ; i++)
 				if (super_block[i].s_imount==inode)
 					break;
-			if (i >= NR_SUPER) {
+			if (i >= NR_SUPER) 
+			{
 				printk("Mounted inode hasn't got sb\n");
 				if (empty)
 					iput(empty);

@@ -153,16 +153,16 @@ static struct super_block * read_super(int dev)
 
     // 초기화
 	for (i=0;i<I_MAP_SLOTS;i++)
-		s->s_imap[i] = NULL;
+		s->s_imap[i] = NULL; //inode bit map
 	for (i=0;i<Z_MAP_SLOTS;i++)
-		s->s_zmap[i] = NULL;
+		s->s_zmap[i] = NULL; //data bit map
 
 	block=2;
     // s->s_imap_blocks 의 경우   
     // *((struct d_super_block *) s) = *((struct d_super_block *) bh->b_data);
     // 에서 설정된 값
 	for (i=0 ; i < s->s_imap_blocks ; i++)
-		if ((s->s_imap[i]=bread(dev,block)))
+		if ( (s->s_imap[i]=bread(dev,block)) )
 			block++;
 		else
 			break;
@@ -174,7 +174,9 @@ static struct super_block * read_super(int dev)
 			break;
 
     // 읽은 개수와 메타 정보가 다르면 
-	if (block != 2+s->s_imap_blocks+s->s_zmap_blocks) {
+	// 논리 블록 개수가 디바이스가 가져야 할 블록 개수와 동일한지 확인 
+	if (block != 2+s->s_imap_blocks+s->s_zmap_blocks)
+    {
 		for(i=0;i<I_MAP_SLOTS;i++)
 			brelse(s->s_imap[i]);
 		for(i=0;i<Z_MAP_SLOTS;i++)
@@ -232,6 +234,7 @@ int sys_mount(char * dev_name, char * dir_name, int rw_flag)
 	struct super_block * sb;
 	int dev;
 
+	//dev_name = devfile
 	if (!(dev_i=namei(dev_name)))
 		return -ENOENT;
 	dev = dev_i->i_zone[0];
@@ -240,31 +243,44 @@ int sys_mount(char * dev_name, char * dir_name, int rw_flag)
 		return -EPERM;
 	}
 	iput(dev_i);
+
+	//dir_name = target dir 
 	if (!(dir_i=namei(dir_name)))
 		return -ENOENT;
-	if (dir_i->i_count != 1 || dir_i->i_num == ROOT_INO) {
+
+	if (dir_i->i_count != 1 || dir_i->i_num == ROOT_INO) 
+	{
 		iput(dir_i);
 		return -EBUSY;
 	}
+
+	// #define S_ISDIR(m)	(((m) & S_IFMT) == S_IFDIR)
 	if (!S_ISDIR(dir_i->i_mode)) {
 		iput(dir_i);
 		return -EPERM;
 	}
-	if (!(sb=read_super(dev))) {
+
+	if (!(sb=read_super(dev))) 
+    {
 		iput(dir_i);
 		return -EBUSY;
 	}
+
+	//이미 마운트가 되어 있는 경우 
 	if (sb->s_imount) {
 		iput(dir_i);
 		return -EBUSY;
 	}
+
 	if (dir_i->i_mount) {
 		iput(dir_i);
 		return -EPERM;
 	}
+
 	sb->s_imount=dir_i;
-	dir_i->i_mount=1;
-	dir_i->i_dirt=1;		/* NOTE! we don't iput(dir_i) */
+	dir_i->i_mount=1;   // 파일 시스템이 마운트되었다는 것을 표시한다.
+	dir_i->i_dirt=1;	// 정보가 변경 된 것을 표시한다.
+						/* NOTE! we don't iput(dir_i) */
 	return 0;			/* we do that in umount */
 }
 
