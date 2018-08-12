@@ -51,6 +51,8 @@ int sys_sync(void)
 	struct buffer_head * bh;
 
 	sync_inodes();		/* write out inodes into buffers */
+
+    // 실제 데이터를 디스크에 내리는 작업은 아래서 수행한다.
 	bh = start_buffer;
 	for (i=0 ; i<NR_BUFFERS ; i++,bh++) {
 		wait_on_buffer(bh);
@@ -65,6 +67,8 @@ int sync_dev(int dev)
 	int i;
 	struct buffer_head * bh;
 
+    // 먼저 bh 를 디스크에 내린다.
+    // 이유는 이 시점에서는 이미 bh 를 다 사용했다 
 	bh = start_buffer;
 	for (i=0 ; i<NR_BUFFERS ; i++,bh++) {
 		if (bh->b_dev != dev)
@@ -73,6 +77,8 @@ int sync_dev(int dev)
 		if (bh->b_dev == dev && bh->b_dirt)
 			ll_rw_block(WRITE,bh);
 	}
+
+    // sys_sync
 	sync_inodes();
 	bh = start_buffer;
 	for (i=0 ; i<NR_BUFFERS ; i++,bh++) {
@@ -278,6 +284,7 @@ repeat:
 /* already have added "this" block to the cache. check it */
     // 사용할 버퍼를 다시 찾아본다.
     // 해쉬 테이블에 연결된 버퍼인지 확인
+    // 다른 프로세스가 이 블록을 캐쉬에 추가 할수 있다
 	if (find_buffer(dev,block))
     {
         // hash 테이블에 등록되어 있으면 위로 올라가 

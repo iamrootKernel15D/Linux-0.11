@@ -184,6 +184,7 @@ static struct buffer_head * add_entry(struct m_inode * dir,
 	struct dir_entry * de;
 
 	*res_dir = NULL;
+
 #ifdef NO_TRUNCATE
 	if (namelen > NAME_LEN)
 		return NULL;
@@ -191,45 +192,74 @@ static struct buffer_head * add_entry(struct m_inode * dir,
 	if (namelen > NAME_LEN)
 		namelen = NAME_LEN;
 #endif
+    
 	if (!namelen)
 		return NULL;
-	if (!(block = dir->i_zone[0]))
+
+	if ( !(block = dir->i_zone[0]) )
 		return NULL;
+
 	if (!(bh = bread(dir->i_dev,block)))
 		return NULL;
-	i = 0;
+
+	i = 0; // de 를 해당 위치에 저장할수 있는지 확인
 	de = (struct dir_entry *) bh->b_data;
-	while (1) {
-		if ((char *)de >= BLOCK_SIZE+bh->b_data) {
+	while (1) 
+    {
+        // de 를 저장할 곳이 없으면
+		if ( (char *)de >= (BLOCK_SIZE + bh->b_data) ) 
+        {
 			brelse(bh);
 			bh = NULL;
-			block = create_block(dir,i/DIR_ENTRIES_PER_BLOCK);
+            //#define DIR_ENTRIES_PER_BLOCK ((BLOCK_SIZE)/(sizeof (struct dir_entry)))
+            // dir->i_zone[1~] 에 할당
+            // i 가 DIR_ENTRIES_PER_BLOCK 보다 클것이다.
+			block = create_block( dir, i/DIR_ENTRIES_PER_BLOCK );
 			if (!block)
 				return NULL;
-			if (!(bh = bread(dir->i_dev,block))) {
+
+			if ( !(bh = bread(dir->i_dev,block)) ) 
+            {
 				i += DIR_ENTRIES_PER_BLOCK;
+                // bh 가 null 이므로 continue 하면 죽을것 같다.
+                // Null pointer dereference
 				continue;
 			}
+
 			de = (struct dir_entry *) bh->b_data;
 		}
-		if (i*sizeof(struct dir_entry) >= dir->i_size) {
+
+        // 맨 뒤에 추가 하게 되면 
+		if ( (i*sizeof(struct dir_entry)) >= dir->i_size) 
+        {
+            // size 를 계산을 다시 해준다.
 			de->inode=0;
 			dir->i_size = (i+1)*sizeof(struct dir_entry);
 			dir->i_dirt = 1;
 			dir->i_ctime = CURRENT_TIME;
 		}
-		if (!de->inode) {
+
+        // 빈 item 이면 
+		if (!de->inode) 
+        {
 			dir->i_mtime = CURRENT_TIME;
-			for (i=0; i < NAME_LEN ; i++)
+
+            // 이름을 설정 한다
+			for ( i=0; i < NAME_LEN ; i++ )
 				de->name[i]=(i<namelen)?get_fs_byte(name+i):0;
+
 			bh->b_dirt = 1;
 			*res_dir = de;
+
 			return bh;
 		}
+
 		de++;
 		i++;
 	}
+
 	brelse(bh);
+
 	return NULL;
 }
 
@@ -405,8 +435,29 @@ int open_namei(const char * pathname, int flag, int mode,
 		return -EISDIR;
 	}
 
+//struct buffer_head {
+//	char * b_data;			/* pointer to data block (1024 bytes) */
+//	unsigned long b_blocknr;	/* block number */
+//	unsigned short b_dev;		/* device (0 = free) */
+//	unsigned char b_uptodate;
+//	unsigned char b_dirt;		/* 0-clean,1-dirty */
+//	unsigned char b_count;		/* users using this block */
+//	unsigned char b_lock;		/* 0 - ok, 1 -locked */
+//	struct task_struct * b_wait;
+//	struct buffer_head * b_prev;
+//	struct buffer_head * b_next;
+//	struct buffer_head * b_prev_free;
+//	struct buffer_head * b_next_free;
+//};
+//struct dir_entry {
+//	unsigned short inode;
+//	char name[NAME_LEN];
+//};
+    // bh : file 의 메타 정보(dir에 저장되어 있는)
+    // de : bh 안에 있는 file  정보
+    // dir 에서 읽고 싶은 파일의 정보를 읽는다.
 	bh = find_entry(&dir,basename,namelen,&de);
-	if (!bh) 
+	if (!bh) // 파일이 존재하지 않으면
 	{
 		if (!(flag & O_CREAT)) 
 		{
@@ -447,14 +498,22 @@ int open_namei(const char * pathname, int flag, int mode,
 	}
 	inr = de->inode;
 	dev = dir->i_dev;
+
+    // de 사용이 끝난 이후에 bh 를 해제 한다.
+    // de 가 bh의 일부분을 가리킨다.
 	brelse(bh);
 	iput(dir);
+
 	if (flag & O_EXCL)
 		return -EEXIST;
+
+    // 읽고 싶은 file 의 inode 를 읽는다.
 	if (!(inode=iget(dev,inr)))
 		return -EACCES;
-	if ((S_ISDIR(inode->i_mode) && (flag & O_ACCMODE)) ||
-	    !permission(inode,ACC_MODE(flag))) {
+    
+	if ( ( S_ISDIR(inode->i_mode ) && ( flag & O_ACCMODE ) ) ||
+	    !permission( inode,ACC_MODE(flag) ) )
+    {
 		iput(inode);
 		return -EPERM;
 	}

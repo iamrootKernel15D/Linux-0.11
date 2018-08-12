@@ -16,11 +16,15 @@ static void free_ind(int dev,int block)
 
 	if (!block)
 		return;
-	if ((bh=bread(dev,block))) {
+
+	if ((bh=bread(dev,block))) 
+    {
 		p = (unsigned short *) bh->b_data;
 		for (i=0;i<512;i++,p++)
+        {
 			if (*p)
 				free_block(dev,*p);
+        }
 		brelse(bh);
 	}
 	free_block(dev,block);
@@ -34,11 +38,15 @@ static void free_dind(int dev,int block)
 
 	if (!block)
 		return;
-	if ((bh=bread(dev,block))) {
+
+	if ((bh=bread(dev,block))) 
+    {
 		p = (unsigned short *) bh->b_data;
 		for (i=0;i<512;i++,p++)
+        {
 			if (*p)
 				free_ind(dev,*p);
+        }
 		brelse(bh);
 	}
 	free_block(dev,block);
@@ -50,13 +58,21 @@ void truncate(struct m_inode * inode)
 
 	if (!(S_ISREG(inode->i_mode) || S_ISDIR(inode->i_mode)))
 		return;
+
 	for (i=0;i<7;i++)
-		if (inode->i_zone[i]) {
+    {
+		if (inode->i_zone[i]) 
+        {
 			free_block(inode->i_dev,inode->i_zone[i]);
 			inode->i_zone[i]=0;
 		}
+    }
+
+    // 1단계 간접 레벨
 	free_ind(inode->i_dev,inode->i_zone[7]);
+    // 2단계 간접 레벨
 	free_dind(inode->i_dev,inode->i_zone[8]);
+
 	inode->i_zone[7] = inode->i_zone[8] = 0;
 	inode->i_size = 0;
 	inode->i_dirt = 1;
