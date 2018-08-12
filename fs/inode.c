@@ -62,9 +62,10 @@ void sync_inodes(void)
 	struct m_inode * inode;
 
 	inode = 0+inode_table;
-	for(i=0 ; i<NR_INODE ; i++,inode++) {
+	for( i = 0 ; i < NR_INODE ; i++, inode++) 
+    {
 		wait_on_inode(inode);
-		if (inode->i_dirt && !inode->i_pipe)
+		if ( inode->i_dirt && !inode->i_pipe )
 			write_inode(inode);
 	}
 }
@@ -74,66 +75,112 @@ static int _bmap(struct m_inode * inode,int block,int create)
 	struct buffer_head * bh;
 	int i;
 
-	if (block<0)
+	if ( block < 0 )
 		panic("_bmap: block<0");
-	if (block >= 7+512+512*512)
+
+	if ( block >= (7 + 512 + 512*512) )
 		panic("_bmap: block>big");
-	if (block<7) {
-		if (create && !inode->i_zone[block])
-			if ((inode->i_zone[block]=new_block(inode->i_dev))) {
+
+    // 7 블록 이하 일때 
+	if ( block < 7 ) 
+    {
+        // 생성해야 하고
+        // 해당 블록 위치에 izone 에 블록이 할당되어 있지 않으면
+		if ( create && !inode->i_zone[block] )
+        {
+			if ((inode->i_zone[block]=new_block(inode->i_dev))) 
+            {
 				inode->i_ctime=CURRENT_TIME;
 				inode->i_dirt=1;
 			}
+        }
 		return inode->i_zone[block];
 	}
+
+    // 7 블록 이상 이고 7 + 512 이하면 
+    // 1단계 간접 블록이면
 	block -= 7;
-	if (block<512) {
-		if (create && !inode->i_zone[7])
-			if ((inode->i_zone[7]=new_block(inode->i_dev))) {
+
+	if ( block < 512 ) 
+    {
+		if ( create && !inode->i_zone[7] )
+        {
+			if ( (inode->i_zone[7] = new_block( inode->i_dev )) ) 
+            {
 				inode->i_dirt=1;
 				inode->i_ctime=CURRENT_TIME;
 			}
+        }
+
 		if (!inode->i_zone[7])
 			return 0;
+
 		if (!(bh = bread(inode->i_dev,inode->i_zone[7])))
 			return 0;
+
 		i = ((unsigned short *) (bh->b_data))[block];
-		if (create && !i)
-			if ((i=new_block(inode->i_dev))) {
+		if ( create && !i )
+        {
+			if ((i=new_block(inode->i_dev))) 
+            {
 				((unsigned short *) (bh->b_data))[block]=i;
 				bh->b_dirt=1;
 			}
+        }
+
 		brelse(bh);
+
 		return i;
 	}
+
+    // 7 + 512 이상이고 7 + 512 + 512 * 512 이하면
+    // 2단계 간접블록 
 	block -= 512;
 	if (create && !inode->i_zone[8])
-		if ((inode->i_zone[8]=new_block(inode->i_dev))) {
+    {
+		if ((inode->i_zone[8]=new_block(inode->i_dev))) 
+        {
 			inode->i_dirt=1;
 			inode->i_ctime=CURRENT_TIME;
 		}
+    }
+
 	if (!inode->i_zone[8])
 		return 0;
+
 	if (!(bh=bread(inode->i_dev,inode->i_zone[8])))
 		return 0;
-	i = ((unsigned short *)bh->b_data)[block>>9];
+
+	i = ((unsigned short *)bh->b_data)[block>>9];   // block/512
 	if (create && !i)
-		if ((i=new_block(inode->i_dev))) {
-			((unsigned short *) (bh->b_data))[block>>9]=i;
+    {
+		if ((i=new_block(inode->i_dev))) 
+        {
+			((unsigned short *) (bh->b_data))[block>>9] = i;
 			bh->b_dirt=1;
 		}
+    }
+
 	brelse(bh);
+
 	if (!i)
 		return 0;
+
 	if (!(bh=bread(inode->i_dev,i)))
 		return 0;
-	i = ((unsigned short *)bh->b_data)[block&511];
+
+	i = ((unsigned short *)bh->b_data)[block&511];      // 2단계에서 블록넘버를 찾는다.
 	if (create && !i)
-		if ((i=new_block(inode->i_dev))) {
+    {
+		if ((i=new_block(inode->i_dev))) 
+        {
 			((unsigned short *) (bh->b_data))[block&511]=i;
 			bh->b_dirt=1;
 		}
+    }
+
 	brelse(bh);
+
 	return i;
 }
 
@@ -154,6 +201,7 @@ void iput(struct m_inode * inode)
 	wait_on_inode(inode);
 	if (!inode->i_count)
 		panic("iput: trying to free free inode");
+
 	if (inode->i_pipe) {
 		wake_up(&inode->i_wait);
 		if (--inode->i_count)
@@ -164,7 +212,9 @@ void iput(struct m_inode * inode)
 		inode->i_pipe=0;
 		return;
 	}
-	if (!inode->i_dev) {
+
+	if (!inode->i_dev)  // empty에 대한 처리`
+    {
 		inode->i_count--;
 		return;
 	}
@@ -331,7 +381,7 @@ static void read_inode(struct m_inode * inode)
 		panic("trying to read inode without dev");
 
     // inode 가 저장된 위치를 찾는다.
-	block = 2 + 
+	block = 2 +                     // super block
             sb->s_imap_blocks +     // i-node bitmap 
             sb->s_zmap_blocks +     // 논리block bitmap
 		    (inode->i_num-1) / INODES_PER_BLOCK;
@@ -341,6 +391,7 @@ static void read_inode(struct m_inode * inode)
 		panic("unable to read i-node block");
     
     // disk 로 부터 읽은 inode 정보를 구조체에 설정
+    // d_inode 는 m_inode 에 포함 된다.
 	*(struct d_inode *)inode =
 		((struct d_inode *)bh->b_data)
 			[(inode->i_num-1)%INODES_PER_BLOCK];
@@ -356,21 +407,34 @@ static void write_inode(struct m_inode * inode)
 	int block;
 
 	lock_inode(inode);
-	if (!inode->i_dirt || !inode->i_dev) {
+
+	if (!inode->i_dirt || !inode->i_dev) 
+    {
 		unlock_inode(inode);
 		return;
 	}
+
 	if (!(sb=get_super(inode->i_dev)))
 		panic("trying to write inode without device");
-	block = 2 + sb->s_imap_blocks + sb->s_zmap_blocks +
-		(inode->i_num-1)/INODES_PER_BLOCK;
-	if (!(bh=bread(inode->i_dev,block)))
+
+    // inode 비트맵의 논리 블록 넘버를 계산
+	block = 2 + 
+            sb->s_imap_blocks + 
+            sb->s_zmap_blocks +
+		    (inode->i_num-1)/INODES_PER_BLOCK;
+
+    // 논리 블록을 읽어서
+	if ( !(bh=bread(inode->i_dev,block)) )
 		panic("unable to read i-node block");
-	((struct d_inode *)bh->b_data)
-		[(inode->i_num-1)%INODES_PER_BLOCK] =
+    
+    // inode 를 논리 블록의 저장할 위치에 저장
+	((struct d_inode *)bh->b_data)[(inode->i_num-1)%INODES_PER_BLOCK] =
 			*(struct d_inode *)inode;
+
 	bh->b_dirt=1;
 	inode->i_dirt=0;
+
 	brelse(bh);
+
 	unlock_inode(inode);
 }

@@ -54,21 +54,26 @@ void free_block(int dev, int block)
 	if (block < sb->s_firstdatazone || block >= sb->s_nzones)
 		panic("trying to free block not in datazone");
 	bh = get_hash_table(dev,block);
-	if (bh) {
-		if (bh->b_count != 1) {
+	if (bh) 
+    {
+		if (bh->b_count != 1) 
+        {
 			printk("trying to free block (%04x:%d), count=%d\n",
 				dev,block,bh->b_count);
 			return;
 		}
+
 		bh->b_dirt=0;
 		bh->b_uptodate=0;
 		brelse(bh);
 	}
 	block -= sb->s_firstdatazone - 1 ;
-	if (clear_bit(block&8191,sb->s_zmap[block/8192]->b_data)) {
+	if (clear_bit(block&8191,sb->s_zmap[block/8192]->b_data)) 
+    {
 		printk("block (%04x:%d) ",dev,block+sb->s_firstdatazone-1);
 		panic("free_block: bit already cleared");
 	}
+
 	sb->s_zmap[block/8192]->b_dirt = 1;
 }
 
@@ -80,24 +85,38 @@ int new_block(int dev)
 
 	if (!(sb = get_super(dev)))
 		panic("trying to get new block from nonexistant device");
+
 	j = 8192;
-	for (i=0 ; i<8 ; i++)
-		if ((bh=sb->s_zmap[i]))
+	for ( i=0 ; i<8 ; i++ )
+    {
+		if ( (bh=sb->s_zmap[i]) )
+        {
 			if ((j=find_first_zero(bh->b_data))<8192)
 				break;
-	if (i>=8 || !bh || j>=8192)
+        }
+    }
+
+	if ( i>=8 || !bh || j>=8192 )
 		return 0;
+    
 	if (set_bit(j,bh->b_data))
 		panic("new_block: bit already set");
+
 	bh->b_dirt = 1;
-	j += i*8192 + sb->s_firstdatazone-1;
-	if (j >= sb->s_nzones)
+
+	j += i*8192 + sb->s_firstdatazone-1;    // s_firstdatazone	데이터 블록의 시작 인덱스
+	if (j >= sb->s_nzones)  // s_nzones	파일시스템의 크기 (전체 블록 수)
 		return 0;
-	if (!(bh=getblk(dev,j)))
+	
+    if (!(bh=getblk(dev,j)))
 		panic("new_block: cannot get block");
+
 	if (bh->b_count != 1)
 		panic("new block: count is != 1");
+
+    // 0 으로 clear
 	clear_block(bh->b_data);
+    
 	bh->b_uptodate = 1;
 	bh->b_dirt = 1;
 	brelse(bh);
@@ -140,21 +159,36 @@ struct m_inode * new_inode(int dev)
 	struct buffer_head * bh;
 	int i,j;
 
-	if (!(inode=get_empty_inode()))
+	if ( !(inode = get_empty_inode()) )
 		return NULL;
-	if (!(sb = get_super(dev)))
+
+	if ( !(sb = get_super(dev)) )
 		panic("new_inode with unknown device");
-	j = 8192;
-	for (i=0 ; i<8 ; i++)
-		if ((bh=sb->s_imap[i]))
-			if ((j=find_first_zero(bh->b_data))<8192)
+    
+	j = 8192;   // block의 최대 bit 수
+	for ( i = 0 ; i < 8 ; i++ )
+    {
+		if ( (bh = sb->s_imap[i]) )
+        {
+            // inode bitmap 위치에서 지정할 inode 의 번호를 찾는다
+            // 최종 inode 번호는 앞비트맵의 개수도 더해야 한다.
+	        // inode->i_num = j + i*8192;
+			if ( ( j = find_first_zero(bh->b_data) ) < 8192 )
 				break;
-	if (!bh || j >= 8192 || j+i*8192 > sb->s_ninodes) {
+        }
+    }
+
+	if ( (!bh) || 
+         ( j >= 8192) || 
+         ( j + i*8192 > sb->s_ninodes ) )
+    {
 		iput(inode);
 		return NULL;
 	}
-	if (set_bit(j,bh->b_data))
+
+	if ( set_bit(j,bh->b_data) )
 		panic("new_inode: bit already set");
+
 	bh->b_dirt = 1;
 	inode->i_count=1;
 	inode->i_nlinks=1;

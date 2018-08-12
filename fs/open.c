@@ -154,7 +154,7 @@ int sys_open(const char * filename,int flag,int mode)
 	// 시작주소 
 	f=0+file_table;
 	for (i=0 ; i<NR_FILE ; i++,f++)
-		if (!f->f_count) //TODO f_count 의 의미는 무엇인가? 
+		if (!f->f_count) //f_count : 참조카운트, f_count가 0이면 빈것으로 가정
 			 break;
 
 	if (i>=NR_FILE)
