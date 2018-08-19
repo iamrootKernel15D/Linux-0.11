@@ -64,9 +64,9 @@ unsigned long get_free_page(void)
 {
 register unsigned long __res asm("ax");
 
-__asm__("std ; repne ; scasb\n\t"
+__asm__("std ; repne ; scasb\n\t"//참조 카운트가 0인 페이지를 선택한다.
 	"jne 1f\n\t"
-	"movb $1,1(%%edi)\n\t"
+	"movb $1,1(%%edi)\n\t"// 페이지가 선택되면 참조카운트를 1로 설정한다.
 	"sall $12,%%ecx\n\t"
 	"addl %2,%%ecx\n\t"
 	"movl %%ecx,%%edx\n\t"
@@ -77,7 +77,7 @@ __asm__("std ; repne ; scasb\n\t"
 	"1: cld"
 	:"=a" (__res)
 	:"0" (0),"i" (LOW_MEM),"c" (PAGING_PAGES),
-	"D" (mem_map+PAGING_PAGES-1)
+	"D" (mem_map+PAGING_PAGES-1)//mem_map이 관리하는 범위의 페이지를 대상으로만 찾는다
 	);
 return __res;
 }

@@ -198,11 +198,11 @@ void iput(struct m_inode * inode)
 {
 	if (!inode)
 		return;
-	wait_on_inode(inode);
-	if (!inode->i_count)
+	wait_on_inode(inode);//사용중이면 대기한다.
+	if (!inode->i_count) //참조 카운터가 0인지 확인한다.
 		panic("iput: trying to free free inode");
 
-	if (inode->i_pipe) {
+	if (inode->i_pipe) {//inode가 파이프인지 확인한다.
 		wake_up(&inode->i_wait);
 		if (--inode->i_count)
 			return;
@@ -214,30 +214,30 @@ void iput(struct m_inode * inode)
 	}
 
 	if (!inode->i_dev)  // empty에 대한 처리`
-    {
-		inode->i_count--;
+    {// 디바이스 넘버가 0인지 확인한다.
+		inode->i_count--;//inode참조 카운터를 줄인다.
 		return;
 	}
-	if (S_ISBLK(inode->i_mode)) {
-		sync_dev(inode->i_zone[0]);
+	if (S_ISBLK(inode->i_mode)) {//inode가 블록디바이스 파일의 inode인지 확인한다.
+		sync_dev(inode->i_zone[0]);//inode를 디스크에 동기화 시킨다
 		wait_on_inode(inode);
 	}
 repeat:
-	if (inode->i_count>1) {
-		inode->i_count--;
+	if (inode->i_count>1) {//inode의 참조 카운터가 1이상이면
+		inode->i_count--;//카운터를 하나 낮춘다
 		return;
 	}
-	if (!inode->i_nlinks) {
-		truncate(inode);
-		free_inode(inode);
+	if (!inode->i_nlinks) {//inode의 링크카운터가 0인지 확인
+		truncate(inode);//inode의 논리블록을 해제한다
+		free_inode(inode);//inode를 해제
 		return;
 	}
 	if (inode->i_dirt) {
 		write_inode(inode);	/* we can sleep - so do again */
-		wait_on_inode(inode);
-		goto repeat;
+		wait_on_inode(inode);// 쓰는 동안 프로세스가 슬립에 들어갔을 수도 있으니 repeat로 돌아가서 다시 확인한다
+		goto repeat;//TODO 
 	}
-	inode->i_count--;
+	inode->i_count--;//참조카운터를 줄인다.
 	return;
 }
 

@@ -793,7 +793,7 @@ int sys_unlink(const char * name)
 		iput(dir);
 		return -EPERM;
 	}
-	bh = find_entry(&dir,basename,namelen,&de);
+	bh = find_entry(&dir,basename,namelen,&de);//파일의 디렉토리 엔트리를 찾는다.
 	if (!bh) {
 		iput(dir);
 		return -ENOENT;
@@ -803,9 +803,9 @@ int sys_unlink(const char * name)
 		brelse(bh);
 		return -ENOENT;
 	}
-	if ((dir->i_mode & S_ISVTX) && !suser() &&
+	if ((dir->i_mode & S_ISVTX) && !suser() &&//S_ISVTX는 sticky bit로 삭제나 변경이 가능한지 확인
 	    current->euid != inode->i_uid &&
-	    current->euid != dir->i_uid) {
+	    current->euid != dir->i_uid) {// 유저 프로세스가 파일 쓰기 권한이 없는 경우
 		iput(dir);
 		iput(inode);
 		brelse(bh);

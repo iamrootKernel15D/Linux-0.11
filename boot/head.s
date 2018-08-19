@@ -206,7 +206,7 @@ setup_paging:
 	movl $pg1+7,pg_dir+4		/*  --------- " " --------- */
 	movl $pg2+7,pg_dir+8		/*  --------- " " --------- */
 	movl $pg3+7,pg_dir+12		/*  --------- " " --------- */
-	movl $pg3+4092,%edi
+	movl $pg3+4092,%edi /* TODO */
 	movl $0xfff007,%eax		/*  16Mb - 4096 + 7 (r/w user,p) */
 	std
 1:	stosl			/* fill pages backwards - more efficient :-) */
