@@ -62,7 +62,7 @@ void truncate(struct m_inode * inode)
 	for (i=0;i<7;i++)
     {
 		if (inode->i_zone[i]) 
-        {
+        {// 직접레벨 
 			free_block(inode->i_dev,inode->i_zone[i]);
 			inode->i_zone[i]=0;
 		}
