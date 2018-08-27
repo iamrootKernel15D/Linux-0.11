@@ -227,7 +227,7 @@ unsigned long put_page(unsigned long page,unsigned long address)
     {
 		if (!(tmp=get_free_page()))
 			return 0;
-		*page_table = tmp|7;
+		*page_table = tmp|7; // 페이지 디렉토리 엔트리의 P 플래그를 1로 설정한다.
 		page_table = (unsigned long *) tmp;
 	}
 
