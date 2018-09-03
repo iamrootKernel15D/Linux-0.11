@@ -370,7 +370,8 @@ void do_timer(long cpl)
 	}
 	if (current_DOR & 0xf0)
 		do_floppy_timer();
-	if ((--current->counter)>0) return;
+	if ( (--current->counter) > 0 )
+		return;
 	current->counter=0;
 	if (!cpl) return;
 	schedule();
