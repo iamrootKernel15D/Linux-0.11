@@ -69,7 +69,10 @@ void sync_inodes(void)
 			write_inode(inode);
 	}
 }
-
+// i-node 관리 다이어그램 288페이지 그림 참조
+// 7 개 직접, 512 개 1단계 간접, 512*512개 2단계 간접
+// 몇번째 블럭인지를 파라미터로 받아서 
+// 블럭넘버를 반환한다
 static int _bmap(struct m_inode * inode,int block,int create)
 {
 	struct buffer_head * bh;

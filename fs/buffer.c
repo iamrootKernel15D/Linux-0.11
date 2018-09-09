@@ -189,10 +189,14 @@ static struct buffer_head * find_buffer(int dev, int block)
 {		
 	struct buffer_head * tmp;
 
+    // 충돌이 나면 여러번 실행
 	for (tmp = hash(dev,block) ; tmp != NULL ; tmp = tmp->b_next)
-		if (tmp->b_dev==dev && tmp->b_blocknr==block)
-			return tmp;
-	return NULL;
+    {
+        if (tmp->b_dev==dev && tmp->b_blocknr==block)
+			return tmp;return
+    }
+    
+    return NULL;
 }
 
 /*
@@ -273,12 +277,12 @@ repeat:
 	wait_on_buffer(bh); // lock 이 풀릴때까지 대기 
 	if (bh->b_count)
 		goto repeat;
-
+    // dirty 이면
 	while (bh->b_dirt) {
 		sync_dev(bh->b_dev);
 		wait_on_buffer(bh);
 		if (bh->b_count)
-			goto repeat;
+			goto repeat;//맨위로 다시 가서 리턴
 	}
 /* NOTE!! While we slept waiting for this block, somebody else might */
 /* already have added "this" block to the cache. check it */
@@ -294,19 +298,17 @@ repeat:
 
 /* OK, FINALLY we know that this buffer is the only one of it's kind, */
 /* and that it's unused (b_count=0), unlocked (b_lock=0), and clean */
-	bh->b_count=1;
-	bh->b_dirt=0;
-	bh->b_uptodate=0;
-
-    // !!!!추정!!!!
+	// !!!!추정!!!!
     // 프로세스간 동시성 이슈 로 인하여
     // 큐에서 먼저 제거 한 이후에 
     // 정보를 설정하고 
     // 그 다음에 큐에 다시 넣는다.
-	remove_from_queues(bh);
-
-	bh->b_dev=dev;
-	bh->b_blocknr=block;
+	bh->b_count=1;
+	bh->b_dirt=0;
+	bh->b_uptodate=0;
+    remove_from_queues(bh);
+	bh->b_dev=dev;// 새 블록넘버를 설정한다
+	bh->b_blocknr=block;//새 버퍼 블록에 블록 넘버를 설정한다
 	insert_into_queues(bh);
 	return bh;
 }
@@ -332,11 +334,13 @@ struct buffer_head * bread(int dev,int block)
 	if (!(bh=getblk(dev,block)))
 		panic("bread: getblk returned NULL\n");
 	if (bh->b_uptodate)
-		return bh;
-	ll_rw_block(READ,bh);
-	wait_on_buffer(bh);
+		return bh;//최신이면 읽어오지 않고 그냥 리턴
+	// 디스크에서 읽어온다
+    ll_rw_block(READ,bh);
+	// 스케쥴링이 일어나다
+    wait_on_buffer(bh);
 	if (bh->b_uptodate)
-		return bh;
+		return bh;//최신이면 리턴
 	brelse(bh);
 	return NULL;
 }
