@@ -193,9 +193,9 @@ static struct buffer_head * find_buffer(int dev, int block)
 	for (tmp = hash(dev,block) ; tmp != NULL ; tmp = tmp->b_next)
     {
         if (tmp->b_dev==dev && tmp->b_blocknr==block)
-			return tmp;return
+			return tmp;
     }
-    
+
     return NULL;
 }
 
@@ -251,7 +251,7 @@ repeat:
     /* free_list 초기화는 buffer_init() 에서 수행 
      * 최초수행시 start_buffer 를 가리키고 있음
      */
-	tmp = free_list;
+    tmp = free_list;
 	do {
 		if (tmp->b_count) // 참조 카운트
         	//unsigned char b_count;		/* users using this block */
