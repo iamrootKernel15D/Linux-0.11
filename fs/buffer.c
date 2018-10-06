@@ -81,6 +81,7 @@ int sync_dev(int dev)
     // sys_sync
 	sync_inodes();
 	bh = start_buffer;
+    //sync_inodes 에서 버퍼에 쓰기 때문에 한번 더 버퍼를 sync 한다.
 	for (i=0 ; i<NR_BUFFERS ; i++,bh++) {
 		if (bh->b_dev != dev)
 			continue;
@@ -298,11 +299,6 @@ repeat:
 
 /* OK, FINALLY we know that this buffer is the only one of it's kind, */
 /* and that it's unused (b_count=0), unlocked (b_lock=0), and clean */
-	// !!!!추정!!!!
-    // 프로세스간 동시성 이슈 로 인하여
-    // 큐에서 먼저 제거 한 이후에 
-    // 정보를 설정하고 
-    // 그 다음에 큐에 다시 넣는다.
 	bh->b_count=1;
 	bh->b_dirt=0;
 	bh->b_uptodate=0;

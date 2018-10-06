@@ -67,7 +67,7 @@ static void add_request(struct blk_dev_struct * dev, struct request * req)
 	struct request * tmp;
 
 	req->next = NULL;
-	cli();
+	cli();//인터럽트 중지 
 
 	if (req->bh)
 		req->bh->b_dirt = 0;
@@ -75,7 +75,7 @@ static void add_request(struct blk_dev_struct * dev, struct request * req)
     // dev 에 이전의 request 없으면
 	if (!(tmp = dev->current_request)) {
 		dev->current_request = req;
-		sti();
+		sti();//인터럽트 재시작 
 		(dev->request_fn)();
 		return;
 	}
@@ -84,10 +84,14 @@ static void add_request(struct blk_dev_struct * dev, struct request * req)
 
     // 엘레베이터 알고리즘 적용하여
     // 적절한 위치를 찾는다.
+    /* 우선순위 
+     1. cmd  (read/write)
+     2. dev
+     3. sector
+     */
 	for ( ; tmp->next ; tmp=tmp->next)
-		if ((IN_ORDER(tmp,req) || 
-		    !IN_ORDER(tmp,tmp->next)) &&
-		    IN_ORDER(req,tmp->next))
+		if ( (IN_ORDER(tmp,req) || !IN_ORDER(tmp,tmp->next)) &&
+		    IN_ORDER(req,tmp->next) )
 			break;
 
 	req->next=tmp->next;
@@ -102,7 +106,8 @@ static void make_request(int major,int rw, struct buffer_head * bh)
 
 /* WRITEA/READA is special case - it is not really needed, so if the */
 /* buffer is locked, we just forget about it, else it's a normal read */
-	if ((rw_ahead = (rw == READA || rw == WRITEA))) {
+	if ( (rw_ahead = (rw == READA || rw == WRITEA)) )
+    {
 		if (bh->b_lock)
 			return;
 		if (rw == READA)
@@ -115,6 +120,8 @@ static void make_request(int major,int rw, struct buffer_head * bh)
 		panic("Bad block dev command, must be R/W/RA/WA");
 
 	lock_buffer(bh);
+    //write 일때 dirt가 아니면 무시.
+    //uptodate 가 1 일때 READ면 무시. uptodate가 1로 세팅되어 있으면 최신 데이터.
 	if ((rw == WRITE && !bh->b_dirt) || 
         (rw == READ && bh->b_uptodate)) {
 		unlock_buffer(bh);

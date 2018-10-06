@@ -351,8 +351,8 @@ repeat: \
 */
 	dev = MINOR(CURRENT->dev);
 	block = CURRENT->sector;
-	if (dev >= 5*NR_HD || 
-        block+2 > hd[dev].nr_sects) { // ??? +2 왜 하는지???
+	if (dev >= 5*NR_HD || block+2 > hd[dev].nr_sects) 
+    { // ??? +2 왜 하는지???
 		end_request(0);
 		goto repeat;
 	}
@@ -370,9 +370,9 @@ repeat: \
 		mov eax,block
 		xor edx,edx
 		mov ebx,sec
-		div ebx         // eax / edx -> block / sec
-		mov block,eax
-		mov sec,edx
+		div ebx         // eax(block) / edx(sec) 
+		mov block,eax  // eax = 몫
+		mov sec,edx    // edx = 나머지 
 	}
     */
 	__asm__("divl %4":"=a" (cyl),
@@ -394,7 +394,8 @@ repeat: \
 
 	sec++;
 	nsect = CURRENT->nr_sectors;
-	if (reset) {
+    //추정 reset은 하드의 헤드 위치 초기화? 
+	if (reset) { 
 		reset = 0;
 		recalibrate = 1;
 		reset_hd(CURRENT_DEV);
@@ -406,18 +407,26 @@ repeat: \
 			WIN_RESTORE,&recal_intr);
 		return;
 	}	
-	if (CURRENT->cmd == WRITE) {
+
+	if (CURRENT->cmd == WRITE) 
+    {
+        //추정 하드 헤드 이동 
 		hd_out(dev,nsect,sec,head,cyl,WIN_WRITE,&write_intr);
-		for(i=0 ; i<3000 && !(r=inb_p(HD_STATUS)&DRQ_STAT) ; i++)
+		for(i=0 ; i<3000 && !(r=inb_p(HD_STATUS) & DRQ_STAT) ; i++)
 			/* nothing */ ;
+
 		if (!r) {
 			bad_rw_intr();
 			goto repeat;
 		}
+        // #define port_write(port,buf,nr) \
+        // __asm__("cld; rep; outsw"::"d" (port),"S" (buf),"c" (nr))
+        // 추정 실제 데이터 쓰기 작업. 
 		port_write(HD_DATA,CURRENT->buffer,256);
-	} else if (CURRENT->cmd == READ) {
+	} 
+    else if (CURRENT->cmd == READ) 
 		hd_out(dev,nsect,sec,head,cyl,WIN_READ,&read_intr);
-	} else
+    else
 		panic("unknown hd-command");
 }
 

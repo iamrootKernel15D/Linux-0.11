@@ -396,8 +396,7 @@ static void read_inode(struct m_inode * inode)
     // disk 로 부터 읽은 inode 정보를 구조체에 설정
     // d_inode 는 m_inode 에 포함 된다.
 	*(struct d_inode *)inode =
-		((struct d_inode *)bh->b_data)
-			[(inode->i_num-1)%INODES_PER_BLOCK];
+		((struct d_inode *)bh->b_data)[(inode->i_num-1)%INODES_PER_BLOCK];
 
 	brelse(bh);
 	unlock_inode(inode);

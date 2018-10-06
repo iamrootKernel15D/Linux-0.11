@@ -38,7 +38,7 @@ struct request {
  * are much more time-critical than writes.
  */
 #define IN_ORDER(s1,s2) \
-((s1)->cmd<(s2)->cmd || ((s1)->cmd==(s2)->cmd && \
+((s1)->cmd < (s2)->cmd || ((s1)->cmd == (s2)->cmd && \
 ((s1)->dev < (s2)->dev || ((s1)->dev == (s2)->dev && \
 (s1)->sector < (s2)->sector))))
 
@@ -122,7 +122,7 @@ static inline void end_request(int uptodate)
 			CURRENT->bh->b_blocknr);
 	}
 
-	wake_up(&CURRENT->waiting); // waiting 을 설정하는곳 없음
+	wake_up(&CURRENT->waiting); //sleep_on 에서 설정함. 
     //extern struct task_struct * wait_for_request;
 	wake_up(&wait_for_request);
 	CURRENT->dev = -1;
