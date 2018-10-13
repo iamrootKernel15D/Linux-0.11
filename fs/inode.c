@@ -298,12 +298,14 @@ struct m_inode * get_pipe_inode(void)
 
 	if (!(inode = get_empty_inode()))
 		return NULL;
-	if (!(inode->i_size=get_free_page())) {
+	if (!(inode->i_size=get_free_page())) {//주소를 i_size에 얻어온다
 		inode->i_count = 0;
 		return NULL;
 	}
 	inode->i_count = 2;	/* sum of readers/writers */
-	PIPE_HEAD(*inode) = PIPE_TAIL(*inode) = 0;
+	//#define PIPE_HEAD(inode) ((inode).i_zone[0])
+    //#define PIPE_TAIL(inode) ((inode).i_zone[1])
+    PIPE_HEAD(*inode) = PIPE_TAIL(*inode) = 0;//큐의 위치를 초기화
 	inode->i_pipe = 1;
 	return inode;
 }
