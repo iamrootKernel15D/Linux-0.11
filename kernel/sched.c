@@ -120,7 +120,7 @@ void schedule(void)
 
             if ( ( (*p)->signal & ~(_BLOCKABLE & (*p)->blocked) ) &&
                  ( (*p)->state == TASK_INTERRUPTIBLE ) )
-            {
+            {// 시그널을 받는 경우 
 				(*p)->state=TASK_RUNNING;
             }
 		}
