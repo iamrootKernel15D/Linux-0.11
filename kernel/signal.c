@@ -91,29 +91,45 @@ void do_signal(long signr,long eax, long ebx, long ecx, long edx,
 	unsigned long * tmp_esp;
 
 	sa_handler = (unsigned long) sa->sa_handler;
+
 	if (sa_handler==1)
+    {
+//#define SIG_IGN		((void (*)(int))1)	/* ignore signal */
 		return;
-	if (!sa_handler) {
+    }
+
+	if (!sa_handler) 
+    {
 		if (signr==SIGCHLD)
 			return;
 		else
 			do_exit(1<<(signr-1));
 	}
+
 	if (sa->sa_flags & SA_ONESHOT)
+    {
+//#define SIG_DFL		((void (*)(int))0)	/* default signal handling */
 		sa->sa_handler = NULL;
+    }
+
 	*(&eip) = sa_handler;
-	longs = (sa->sa_flags & SA_NOMASK)?7:8;
+
+	longs = (sa->sa_flags & SA_NOMASK)?7:8; // count
 	*(&esp) -= longs;
+
 	verify_area(esp,longs*4);
 	tmp_esp=esp;
 	put_fs_long((long) sa->sa_restorer,tmp_esp++);
 	put_fs_long(signr,tmp_esp++);
+
 	if (!(sa->sa_flags & SA_NOMASK))
 		put_fs_long(current->blocked,tmp_esp++);
+
 	put_fs_long(eax,tmp_esp++);
 	put_fs_long(ecx,tmp_esp++);
 	put_fs_long(edx,tmp_esp++);
 	put_fs_long(eflags,tmp_esp++);
 	put_fs_long(old_eip,tmp_esp++);
+
 	current->blocked |= sa->sa_mask;
 }
