@@ -91,17 +91,27 @@ void do_signal(long signr,long eax, long ebx, long ecx, long edx,
 	unsigned long * tmp_esp;
 
 	sa_handler = (unsigned long) sa->sa_handler;
+  
 	if (sa_handler==1)// 무시하는 경우
+//#define SIG_IGN		((void (*)(int))1)	/* ignore signal */
 		return;
-	if (!sa_handler) {
+    }
+
+	if (!sa_handler) 
+    {
 		if (signr==SIGCHLD)
 			return;
 		else
 			do_exit(1<<(signr-1));
 	}
+
 	if (sa->sa_flags & SA_ONESHOT)// oneshot : 한번만 실행
+//#define SIG_DFL		((void (*)(int))0)	/* default signal handling */
 		sa->sa_handler = NULL;
+    }
+
 	*(&eip) = sa_handler;
+
 	longs = (sa->sa_flags & SA_NOMASK)?7:8;// 스택에 비워주는 공간
 	*(&esp) -= longs;
 	verify_area(esp,longs*4);// 미리 공간을 확보
@@ -115,5 +125,6 @@ void do_signal(long signr,long eax, long ebx, long ecx, long edx,
 	put_fs_long(edx,tmp_esp++);//6
 	put_fs_long(eflags,tmp_esp++);//7
 	put_fs_long(old_eip,tmp_esp++);//8
+
 	current->blocked |= sa->sa_mask;
 }

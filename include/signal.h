@@ -34,6 +34,14 @@ typedef unsigned int sigset_t;		/* 32 bits */
 #define SIGTTOU		22
 
 /* Ok, I haven't implemented sigactions, but trying to keep headers POSIX */
+/*
+ * SA_NOCLDSTOP: Don't send SIGCHLD when a child process is stopped.
+ * SA_RESTART: Force restart of certain system calls when interrupted by a signal handler.
+ * SA_NOMASK: Disable signal mask (which blocks signals during execution of a signal handler).
+ * SA_ONESHOT: Clear signal handler after execution. Note that SVR4 uses SA_RESETHAND to mean the same thing.
+ * SA_INTERRUPT: Defined under Linux, but unused. Under SunOS, system calls were automatically restarted, and this flag disabled that behavior.
+ * SA_STACK: Currently a no-op, to be used for signal stacks
+ */
 #define SA_NOCLDSTOP	1
 #define SA_NOMASK	0x40000000
 #define SA_ONESHOT	0x80000000
