@@ -277,7 +277,7 @@ void do_wp_page(unsigned long error_code,unsigned long address)
 		*((unsigned long *) ((address>>20) &0xffc)))));
 
 }
-
+// 메모리 공간의 유효성을 검사
 void write_verify(unsigned long address)
 {
 	unsigned long page;

@@ -38,7 +38,7 @@ static inline int send_sig(long sig,struct task_struct * p,int priv)
 	if (!p || sig<1 || sig>32)
 		return -EINVAL;
 
-    // 권한 체크
+    // 권한 체크- 같은 그룹이거나 euid : effetive user id가 같거나 슈퍼유저 
 	if (priv || (current->euid==p->euid) || suser())
     {
 		p->signal |= (1<<(sig-1));
@@ -74,22 +74,32 @@ int sys_kill(int pid,int sig)
 	struct task_struct **p = NR_TASKS + task;
 	int err, retval = 0;
 
-	if (!pid) while (--p > &FIRST_TASK) {
-		if (*p && (*p)->pgrp == current->pid) 
-			if ((err=send_sig(sig,*p,1)))
-				retval = err;
-	} else if (pid>0) while (--p > &FIRST_TASK) {
-		if (*p && (*p)->pid == pid) 
-			if ((err=send_sig(sig,*p,0)))
-				retval = err;
-	} else if (pid == -1) while (--p > &FIRST_TASK) {
-		if ((err = send_sig(sig,*p,0)))
-			retval = err;
-	} else while (--p > &FIRST_TASK)
-		if (*p && (*p)->pgrp == -pid)
-			if ((err = send_sig(sig,*p,0)))
-				retval = err;
-	return retval;
+    if (!pid) // pid 가 0인 경우, 자식
+        while (--p > &FIRST_TASK) 
+        {//pgrp 프로세스 그룹?
+            if (*p && (*p)->pgrp == current->pid) 
+                if ((err=send_sig(sig,*p,1)))// priv = 1 (권한)
+                    retval = err;
+        } 
+    else if (pid>0) // 0보다 클때
+        while (--p > &FIRST_TASK)
+        {
+            if (*p && (*p)->pid == pid) 
+                if ((err=send_sig(sig,*p,0)))// priv = 0 (권한없음)
+                    retval = err;
+        } 
+    else if (pid == -1) // 모든 프로세스
+        while (--p > &FIRST_TASK) 
+        {
+            if ((err = send_sig(sig,*p,0)))// priv = 0 (권한없음)
+                retval = err;
+        } 
+    else 
+        while (--p > &FIRST_TASK)
+            if (*p && (*p)->pgrp == -pid)// 특정 그룹
+                if ((err = send_sig(sig,*p,0)))
+                    retval = err;
+        return retval;
 }
 
 static void tell_father(int pid)

@@ -91,7 +91,7 @@ void do_signal(long signr,long eax, long ebx, long ecx, long edx,
 	unsigned long * tmp_esp;
 
 	sa_handler = (unsigned long) sa->sa_handler;
-	if (sa_handler==1)
+	if (sa_handler==1)// 무시하는 경우
 		return;
 	if (!sa_handler) {
 		if (signr==SIGCHLD)
@@ -99,21 +99,21 @@ void do_signal(long signr,long eax, long ebx, long ecx, long edx,
 		else
 			do_exit(1<<(signr-1));
 	}
-	if (sa->sa_flags & SA_ONESHOT)
+	if (sa->sa_flags & SA_ONESHOT)// oneshot : 한번만 실행
 		sa->sa_handler = NULL;
 	*(&eip) = sa_handler;
-	longs = (sa->sa_flags & SA_NOMASK)?7:8;
+	longs = (sa->sa_flags & SA_NOMASK)?7:8;// 스택에 비워주는 공간
 	*(&esp) -= longs;
-	verify_area(esp,longs*4);
+	verify_area(esp,longs*4);// 미리 공간을 확보
 	tmp_esp=esp;
-	put_fs_long((long) sa->sa_restorer,tmp_esp++);
-	put_fs_long(signr,tmp_esp++);
+	put_fs_long((long) sa->sa_restorer,tmp_esp++);//1
+	put_fs_long(signr,tmp_esp++);//2
 	if (!(sa->sa_flags & SA_NOMASK))
-		put_fs_long(current->blocked,tmp_esp++);
-	put_fs_long(eax,tmp_esp++);
-	put_fs_long(ecx,tmp_esp++);
-	put_fs_long(edx,tmp_esp++);
-	put_fs_long(eflags,tmp_esp++);
-	put_fs_long(old_eip,tmp_esp++);
+		put_fs_long(current->blocked,tmp_esp++);//3
+	put_fs_long(eax,tmp_esp++);//4
+	put_fs_long(ecx,tmp_esp++);//5
+	put_fs_long(edx,tmp_esp++);//6
+	put_fs_long(eflags,tmp_esp++);//7
+	put_fs_long(old_eip,tmp_esp++);//8
 	current->blocked |= sa->sa_mask;
 }
