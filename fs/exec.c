@@ -54,13 +54,15 @@ static unsigned long * create_tables(char * p,int argc,int envc)
 	//sp = sp - ((int)argc + 1);
 	sp -= argc+1;
 	argv = sp;
-    //__asm__ ("movl %0,%%fs:%1"::"r" (val),"m" (*addr));
+    // put_fs_long(unsigned long val,unsigned long * addr)
+    //   { __asm__ ("movl %0,%%fs:%1"::"r" (val),"m" (*addr));
 	put_fs_long((unsigned long)envp,--sp);
 	put_fs_long((unsigned long)argv,--sp);
 	put_fs_long((unsigned long)argc,--sp);
 	while (argc-->0) {
 		put_fs_long((unsigned long) p,argv++);
 		// pass to next argv
+		// __asm__ ("movb %%fs:%1,%0":"=r" (_v):"m" (*addr));
 		while (get_fs_byte(p++)) /* nothing */ ;
 	}
 	// separater (blank)
@@ -387,18 +389,22 @@ restart_interp:
 
 	//프로세스 LDT를 변경한다a
     // p = MAX_ARG_PAGES*PAGE_SIZE - 사용한 size
-    // p = p + 64MB -MAX_ARG_PAGES*PAGE_SIZE
+    // p = (p) + (64MB) - (MAX_ARG_PAGES*PAGE_SIZE)  change_ldt
+    // p = ( MAX_ARG_PAGES*PAGE_SIZE - 사용한 size ) + (64MB) - (MAX_ARG_PAGES*PAGE_SIZE)  change_ldt
+    // p = ( MAX_ARG_PAGES*PAGE_SIZE)- 사용한 size  + (64MB) - (MAX_ARG_PAGES*PAGE_SIZE)  change_ldt
+    // p = ( MAX_ARG_PAGES*PAGE_SIZE) - (MAX_ARG_PAGES*PAGE_SIZE) + (64MB) - 사용한 size  change_ldt
     // p = 64MB - 사용한 size
 	p += change_ldt(ex.a_text,page)-MAX_ARG_PAGES*PAGE_SIZE;
     // 파라미터와환경벼수 관리 포인터 테이블을 프로세스 스택공간에 만든다.
 	p = (unsigned long) create_tables((char *)p,argc,envc);
 	current->brk = ex.a_bss +
-		( current->end_data = ex.a_data + (current->end_code = ex.a_text) );
-	current->start_stack = p & 0xfffff000;
+		( current->end_data = ex.a_data + (current->end_code = ex.a_text) ); // brk = heap영역?
+	current->start_stack = p & 0xfffff000; // 순수 관리 측면용 / TODO : 000은? 스텍 페이지 시작 주소(추측)
 	current->euid = e_uid;
 	current->egid = e_gid;
 	i = ex.a_text+ex.a_data;
-	//메인메모리 BSS 세그먼트페이지 데이터를 0 으로 초기화
+	// text + data 영역 페이지의 마지막 부분 0 으로 초기화
+	// 메인메모리 BSS(text,data,bss 순서/초기화되지 전역변수영역) 세그먼트페이지 데이터를 0 으로 초기화
 	while (i&0xfff)
 		put_fs_byte(0,(char *) (i++));
 	eip[0] = ex.a_entry;		/* eip, magic happens :-) */

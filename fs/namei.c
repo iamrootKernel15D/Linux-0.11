@@ -118,7 +118,7 @@ static struct buffer_head * find_entry(struct m_inode ** dir,
 	if (namelen==2 && get_fs_byte(name)=='.' && get_fs_byte(name+1)=='.') 
 	{
 		/* '..' in a pseudo-root results in a faked '.' (just change namelen) */
-		if ((*dir) == current->root)
+		if ((*dir) == current->root) 
 			namelen=1; // 내가 루트인데 .. 을 주면 . 으로 변경
 		else if ((*dir)->i_num == ROOT_INO) 
 		{
@@ -140,7 +140,7 @@ static struct buffer_head * find_entry(struct m_inode ** dir,
 		return NULL;
 	i = 0;
 	de = (struct dir_entry *) bh->b_data;
-	while (i < entries)
+	while (i < entries) //현재 디렉터리내의 엔트리들
 	{
 		//현재 논리 븐럭에서 원하는 디렉토리 엔트리를 찾지 못하면 
 		if ( (char *)de >= BLOCK_SIZE+bh->b_data ) 
@@ -155,6 +155,7 @@ static struct buffer_head * find_entry(struct m_inode ** dir,
 			}
 			de = (struct dir_entry *) bh->b_data;
 		}
+        //이름이 동일한지 검사.
 		if (match(namelen,name,de)) {
 			*res_dir = de;
 			return bh; // 찾은 경우
@@ -229,7 +230,7 @@ static struct buffer_head * add_entry(struct m_inode * dir,
 			de = (struct dir_entry *) bh->b_data;
 		}
 
-        // 맨 뒤에 추가 하게 되면 
+        // 맨 뒤에 추가 하게 되면 p.299 case 1 
 		if ( (i*sizeof(struct dir_entry)) >= dir->i_size) 
         {
             // size 를 계산을 다시 해준다.
@@ -317,7 +318,8 @@ static struct m_inode * get_dir(const char * pathname)
 		//파일이면 
 		if (!c)
 			return inode; //디렉터리의 아이노드
-	
+
+        //한 디렉터리 안의 엔트리들중 동일한 이름을 찾는다.
 		if (!(bh = find_entry(&inode,thisname,namelen,&de))) 
 		{
 			iput(inode);

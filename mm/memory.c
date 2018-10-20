@@ -227,7 +227,7 @@ unsigned long put_page(unsigned long page,unsigned long address)
     {
 		if (!(tmp=get_free_page()))
 			return 0;
-		*page_table = tmp|7;
+		*page_table = tmp|7; // 페이지 디렉토리 엔트리의 P 플래그를 1로 설정한다.
 		page_table = (unsigned long *) tmp;
 	}
 
@@ -242,7 +242,8 @@ void un_wp_page(unsigned long * table_entry)
 	unsigned long old_page,new_page;
 
 	old_page = 0xfffff000 & *table_entry;
-	if (old_page >= LOW_MEM && mem_map[MAP_NR(old_page)]==1) {
+	if (old_page >= LOW_MEM && mem_map[MAP_NR(old_page)]==1)
+	{
 		*table_entry |= 2;
 		invalidate();
 		return;
@@ -396,21 +397,26 @@ static int share_page(unsigned long address)
 }
 
 void do_no_page(unsigned long error_code,unsigned long address)
+// address : fault난 주소
 {
 	int nr[4];
 	unsigned long tmp;
 	unsigned long page;
 	int block,i;
 
-	address &= 0xfffff000;
-	tmp = address - current->start_code;
+	address &= 0xfffff000; // fault난 페이지의 시작 주소
+	tmp = address - current->start_code; // start_code : 4G중 프로세스의 시작 주소(p x 64M)
+
+	// 코드, 데이터 영역이 아닌 힙, 스택영역에서 폴트가 발생 한 경우. 빈 페이지만 넘겨준다.
 	if (!current->executable || tmp >= current->end_data) 
     {
         // 로딩이 필요한 것이 아니다.
 		get_empty_page(address);    // 스택이 부족한 경우라면 페이지를 새로 할당 
 		return;
 	}
-    
+
+    // 코드 영역과, 데이터 영역을 읽는 부분 BSS는 0이기때문에 안읽어도됨.
+    // end_data = code + data
     // 다른 프로세스의 메모리를 공유 받는다.
 	if (share_page(tmp))
 		return;

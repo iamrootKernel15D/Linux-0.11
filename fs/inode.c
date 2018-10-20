@@ -69,7 +69,10 @@ void sync_inodes(void)
 			write_inode(inode);
 	}
 }
-
+// i-node 관리 다이어그램 288페이지 그림 참조
+// 7 개 직접, 512 개 1단계 간접, 512*512개 2단계 간접
+// 몇번째 블럭인지를 파라미터로 받아서 
+// 블럭넘버를 반환한다
 static int _bmap(struct m_inode * inode,int block,int create)
 {
 	struct buffer_head * bh;
@@ -295,12 +298,14 @@ struct m_inode * get_pipe_inode(void)
 
 	if (!(inode = get_empty_inode()))
 		return NULL;
-	if (!(inode->i_size=get_free_page())) {
+	if (!(inode->i_size=get_free_page())) {//주소를 i_size에 얻어온다
 		inode->i_count = 0;
 		return NULL;
 	}
 	inode->i_count = 2;	/* sum of readers/writers */
-	PIPE_HEAD(*inode) = PIPE_TAIL(*inode) = 0;
+	//#define PIPE_HEAD(inode) ((inode).i_zone[0])
+    //#define PIPE_TAIL(inode) ((inode).i_zone[1])
+    PIPE_HEAD(*inode) = PIPE_TAIL(*inode) = 0;//큐의 위치를 초기화
 	inode->i_pipe = 1;
 	return inode;
 }
@@ -393,8 +398,7 @@ static void read_inode(struct m_inode * inode)
     // disk 로 부터 읽은 inode 정보를 구조체에 설정
     // d_inode 는 m_inode 에 포함 된다.
 	*(struct d_inode *)inode =
-		((struct d_inode *)bh->b_data)
-			[(inode->i_num-1)%INODES_PER_BLOCK];
+		((struct d_inode *)bh->b_data)[(inode->i_num-1)%INODES_PER_BLOCK];
 
 	brelse(bh);
 	unlock_inode(inode);

@@ -72,7 +72,7 @@ int sys_read(unsigned int fd,char * buf,int count)
 	verify_area(buf,count);
     
 	inode = file->f_inode;
-
+    // read pipe 를 호출
 	if (inode->i_pipe)
 		return (file->f_mode&1)?read_pipe(inode,buf,count):-EIO;
 

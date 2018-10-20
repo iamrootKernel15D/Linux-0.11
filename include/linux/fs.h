@@ -57,9 +57,9 @@ void buffer_init(long buffer_end);
 
 #define PIPE_HEAD(inode) ((inode).i_zone[0])
 #define PIPE_TAIL(inode) ((inode).i_zone[1])
-#define PIPE_SIZE(inode) ((PIPE_HEAD(inode)-PIPE_TAIL(inode))&(PAGE_SIZE-1))
+#define PIPE_SIZE(inode) ((PIPE_HEAD(inode)-PIPE_TAIL(inode))&(PAGE_SIZE-1))// 사용하고 있는 파이프 사이즈, overflow 처리방법?
 #define PIPE_EMPTY(inode) (PIPE_HEAD(inode)==PIPE_TAIL(inode))
-#define PIPE_FULL(inode) (PIPE_SIZE(inode)==(PAGE_SIZE-1))
+#define PIPE_FULL(inode) (PIPE_SIZE(inode)==(PAGE_SIZE-1))//1 개는 빼고 써야, empty/full을 구분할 수 있다
 #define INC_PIPE(head) \
 __asm__("incl %0\n\tandl $4095,%0"::"m" (head))
 
@@ -97,7 +97,8 @@ struct m_inode {
 	unsigned long i_mtime;
 	unsigned char i_gid;
 	unsigned char i_nlinks;
-	unsigned short i_zone[9];
+	unsigned short i_zone[9];//6까지는 직접,7은 2단계 8은 3단계
+// runtime 정보
 /* these are in memory also */
 	struct task_struct * i_wait;
 	unsigned long i_atime;

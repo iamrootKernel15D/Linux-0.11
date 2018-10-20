@@ -370,9 +370,11 @@ void do_timer(long cpl)
 	}
 	if (current_DOR & 0xf0)
 		do_floppy_timer();
-	if ((--current->counter)>0) return;
+	if ( (--current->counter) > 0 )
+		return;
 	current->counter=0;
-	if (!cpl) return;
+	if (!cpl) return;// 권한레벨 3에서만 프로세스가 스위칭 될 수 있다
+                     // 권한레벨 0 프로세스는 스위칭되지 않는다
 	schedule();
 }
 

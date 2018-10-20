@@ -202,17 +202,20 @@ setup_paging:
 	xorl %eax,%eax
 	xorl %edi,%edi			/* pg_dir is at 0x000 */
 	cld;rep;stosl
-	movl $pg0+7,pg_dir		/* set present bit/user r/w */
-	movl $pg1+7,pg_dir+4		/*  --------- " " --------- */
+	movl $pg0+7,pg_dir		/* set present bit/user r/w */ /* 페이지 디렉터리에 페이지 테이블 매핑 및 플래그설정 */
+	movl $pg1+7,pg_dir+4		/*  --------- " " --------- */ /* 페이지 테이블당 4MB 그리고 16메가 필요하기 때문에 4번  */
 	movl $pg2+7,pg_dir+8		/*  --------- " " --------- */
 	movl $pg3+7,pg_dir+12		/*  --------- " " --------- */
-	movl $pg3+4092,%edi /* TODO */
+
+	movl $pg3+4092,%edi 	/* 저장 할 시작 점  */
 	movl $0xfff007,%eax		/*  16Mb - 4096 + 7 (r/w user,p) */
-	std
-1:	stosl			/* fill pages backwards - more efficient :-) */
-	subl $0x1000,%eax
-	jge 1b
-	cld
+	std 			/* 내림차순 플래그 셋팅 ( stosl 이 영향을 받는다. )   */
+				/* 페이지 와 물리 주소를 매핑 하는 작업 */
+				/* edi 주소값에 eax값(0xfff007 부터 시작)을 넣는다. */
+1:	stosl			/* fill pages backwards - more efficient :-) */ /* 명령 수행 시 edi 4씩감소l 때문에  */
+	subl $0x1000,%eax   	/* 루프 수행마다 eax 값이 -4096 0x1000위치에서 -0x1000 을 하기때문에 멈춘다. */
+	jge 1b			/* eax 가 0이 되기 전 까지 반복 */
+	cld			/* 오름차순 플래그 셋팅 */
 	xorl %eax,%eax		/* pg_dir is at 0x0000 */
 	movl %eax,%cr3		/* cr3 - page directory start */
 	movl %cr0,%eax
