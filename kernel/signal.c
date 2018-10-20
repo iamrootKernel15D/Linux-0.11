@@ -93,6 +93,7 @@ void do_signal(long signr,long eax, long ebx, long ecx, long edx,
 	sa_handler = (unsigned long) sa->sa_handler;
   
 	if (sa_handler==1)// 무시하는 경우
+    {
 //#define SIG_IGN		((void (*)(int))1)	/* ignore signal */
 		return;
     }
@@ -106,6 +107,7 @@ void do_signal(long signr,long eax, long ebx, long ecx, long edx,
 	}
 
 	if (sa->sa_flags & SA_ONESHOT)// oneshot : 한번만 실행
+    {
 //#define SIG_DFL		((void (*)(int))0)	/* default signal handling */
 		sa->sa_handler = NULL;
     }
